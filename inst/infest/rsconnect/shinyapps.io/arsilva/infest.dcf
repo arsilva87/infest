@@ -1,0 +1,11 @@
+name: infest
+title: infest
+username:
+account: arsilva
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 1963789
+bundleId: 7597856
+url: https://arsilva.shinyapps.io/infest/
+asMultiple: FALSE
+asStatic: FALSE

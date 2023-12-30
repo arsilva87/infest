@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<body>
+
+<div style="background-color:#f2f2f2; color:black; padding:5px;">
+
+<p> INFEST is a Shiny-app written in R to process raw data from the EPG system and to perform statistical analysis on insect feeding behavior data. </p>
+<p> Output files from the 3rd generation EPG can be simultaneously compiled to generate data frames of duration of events per waveform, event count per waveform and sequential event count. </p>
+<p> Duration and event count data can be explored in a biplot if the number of files is greater than the number of waveforms. INFEST automatically generates principal component analysis based on singular value decomposition of standardized data (mean 0, variance 1).  </p>
+
+<p> The duration table is editable so that the user can explore the effect of a factor (Group) on each data set: duration, events and sequential events. In this case, if more than one level of "Group" is set, INFEST creates 95% confidence ellipses for Group levels on each PCA biplot. Furthermore, generalized linear models can be fitted to test the effect of "Group" on the variables. Duration variables can be analysed using Gaussian, Inverse Gaussian of Gamma distribution model. Count data (Events and Sequential events) can be modeled using Poisson, Binomial, QuasiPoisson or QuasiBinomial functions. Tukey's contrasts are automatically calculated to test for pairwise difference of Group means. </p>
+
+<p> The sequential event count data can be graphically studied in a directional network plot.  </p>
+
+<p> INFEST was developed by the Agrometrics Research Group and Lab. MIP from Instituto Federal Goiano - Campus Urutaí (Brazil).  </p>
+
+<p> Citation:
+Silva, A. R. da, Almeida, A. C. S., Gonçalves de Jesus, F., Barrigossi, J. A. F. (2024). INFEST: Insect Feeding Behavior Statistics. INPI - INSTITUTO NACIONAL DA PROPRIEDADE INDUSTRIAL [BR512022001098-4]. Available at: <a href="https://arsilva.shinyapps.io/infest/" target="_blank">arsilva.shinyapps.io/infest</a>
+
+</p>
+
+</div>
+
+
+<h6> <img src="logos.jpg" align="middle" width="300px"> </h6>
+
+<h6> <i Helpdesk:  class="far fa-envelope"></i> anderson.silva@ifgoiano.edu.br   <i class="fas fa-phone"></i> +55 (64) 3465-1912/1975 </h6>
+
+<div style="color:white;">
+<h6>  .  </h6>
+</div>
+
+</body>
+</html>
