@@ -15,6 +15,9 @@ library(emmeans)
 library(shinyjs)
 library(gamlss)
 library(ggeffects)
+library(ggplot2)
+library(reshape2)
+library(plotly)
 
 
 # --------------------------------------------------
@@ -229,9 +232,8 @@ server <- function(input, output, session){
    output$duration <- renderRHandsontable({
      den <- ifelse(input$unit == TRUE, 60, 1)
      df_den <- data.frame(Group = dur()[, 1], round(dur()[, -1]/den, 2))
-     updateSelectInput(session, inputId = 'y', choices = names(df_den),
+     updateSelectInput(session, inputId = 'y', choices = names(df_den)[-1],
                        selected = "t_1Pr")
-     updateSelectInput(session, inputId = 'g', choices = names(df_den))
      rhandsontable(df_den)
    })
    mt <- reactive({
@@ -244,14 +246,14 @@ server <- function(input, output, session){
      DF
    })
 
-   output$graph1 <- renderPlot({
+   output$graph1 <- renderPlotly({
      df <- tab()$duration
      if( length(unique(mt()[, 1])) == 1 ) lev <- NA else lev <- factor(mt()[, 1])
      if (nrow(df) < ncol(df)) {
        showNotification("n is too small for a biplot!", type = "error")
      } else {
        acp1 <- prcomp(scale(df))
-       fviz_pca_biplot(acp1,
+       p <- fviz_pca_biplot(acp1,
                        geom.var = c("arrow", "text"),
                        geom.ind = "text",
                        col.ind = "black",
@@ -261,49 +263,62 @@ server <- function(input, output, session){
                        col.var = "contrib", fill.var = "contrib",
                        legend.title = list(fill = "Group", color = "Contrib (%)"),
                        title = "")
+       ggplotly(p)
      }
-   }, width = 600, height = "auto", res = 80)
+   })
 
-   output$graph12 <- renderPlot({
-     w <- as.matrix(tab()$duration)
-     par(mfrow = c(ceiling(nrow(w)/4), 4), cex = 0.9, mar = c(2, 3, 2, 3))
-     for(i in 1:nrow(w)) {
-       perc = round(100*w[i, ]/sum(w[i, ]), 1)
-       lab = paste0(names(w[i, ]), " (", perc, "%)")
-       pie(w[i, ], radius = 0.9,
-           col = topo.colors(ncol(w)), main = rownames(w)[i],
-           labels = lab, cex.main = 0.9)
-     }
+   output$graph12 <- renderPlotly({
+     den <- ifelse(input$unit == TRUE, 60, 1)
+     dtf <- round(tab()$duration/den, 2)
+     df_den <<- data.frame(X = rownames(dtf), Group = as.factor(mt()[, 1]), dtf)
+     dados_m <- reshape2::melt(df_den, id.vars = 1:2)
+     p <- ggplot(dados_m, aes(y = variable, x = value, fill = Group)) +
+       geom_col(stats = "identity") + xlab("WDi") +
+       facet_wrap(~X) +
+       theme_bw()
+     plotly::ggplotly(p)
    })
 
    observeEvent(input$best_gamlss1, {
      options(width=100)
      output$best_model1 <- renderTable({
        den <- ifelse(input$unit == TRUE, 60, 1)
-       df_den <<- data.frame(Group = mt()[, 1], round(tab()$duration/den, 2))
-       Group <- as.factor(df_den[, input$g])
-       fits <<- apply(df_den[, -1], 2, best_family)
+       df_den <<- data.frame(round(tab()$duration/den, 2))
+       fits <<- apply(df_den, 2, best_family)
        mods_gam <- lapply(fits, "[[", "fit")
-       #LRTs <- lapply(mods_gam, drop1, data = df_den)
        best_fits <- data.frame(
          Variable = names(mods_gam),
          Distribution = sapply(fits, "[[", "family"),
          DFr = round(sapply(fits, "[[", "dfr"), 1),
          AIC = sapply(mods_gam, "[[", "aic"),
          RMSE = sapply(fits, "[[", "rmse")
-         #'LRT(Group)' = sapply(LRTs, "[[", "LRT")[2, ],
-         #'p-value(Group)' = sapply(LRTs, "[[", "Pr(Chi)")[2, ]
          )
        best_fits
      }, digits = 4)
    })
 
+   observeEvent(input$bxp1, {
+     den <- ifelse(input$unit == TRUE, 60, 1)
+     df_den <<- data.frame(Group = as.factor(mt()[, 1]),
+                           round(tab()$duration/den, 2))
+     y <- df_den$y <- df_den[, input$y]
+     yname <- input$y
+     output$boxplot1 <- renderPlotly({
+       p <- ggplot(df_den, aes(x = Group, y = y)) +
+         geom_boxplot() + ylab(yname) +
+         stat_summary(fun=mean, geom="point", shape=5, size = 3,
+                      show.legend = FALSE, color='black') +
+         coord_flip() + theme_bw()
+       ggplotly(p)
+     })
+   })
+
    observeEvent(input$fit_glm1, {
      pval_adj <- ifelse(input$tukey == TRUE, "tukey", "none")
      den <- ifelse(input$unit == TRUE, 60, 1)
-     df_den <<- data.frame(Group = mt()[, 1], round(tab()$duration/den, 2))
+     df_den <<- data.frame(Group = as.factor(mt()[, 1]), round(tab()$duration/den, 2))
      y <- df_den$y <- df_den[, input$y]
-     Group <- df_den$Group <- as.factor(df_den[, input$g])
+     Group <- df_den$Group
      if(nlevels(Group) < 2) {
        showNotification("'Group' has only one level.
                       Go back to the WDi data table and specify more levels.",
@@ -324,7 +339,8 @@ server <- function(input, output, session){
        mod0 <- try(gamlss(y ~ 1, sigma.formula = eval(sigma1), data = df_den,
                       family = get("familia1", envir = .GlobalEnv),
                       control = gamlss.control(trace = F)))
-       med1 <- try(emmeans::emmeans(mod1, "Group", type = "response"))
+       med1 <- try(emmeans::emmeans(mod1, "Group", type = "response",
+                                    level = input$conf1))
        comp_med1 <- try(pairs(med1, adjust = pval_adj))
        if(inherits(mod1, "try-error") |
           inherits(mod0, "try-error") |
@@ -347,18 +363,19 @@ server <- function(input, output, session){
          })
          output$med1 <- renderPrint({ med1 })
          output$contrasts1 <- renderPrint({ comp_med1 })
-         output$graph13 <- renderPlot({ plot(med1, xlab = input$y) +
-             theme_bw(base_size = 12) })
+         output$graph13 <- renderPlotly({
+           ggplotly(plot(med1, xlab = input$y) +
+             theme_bw(base_size = 12))
+         })
        }
      }
    })
 
    # ----------------------------------------- events
    output$events <-  DT::renderDT({
-     df2 <- data.frame(Group = mt()[, 1], tab()$events)
-     updateSelectInput(session, inputId = 'y2', choices = names(df2),
+     df2 <- data.frame(Group = as.factor(mt()[, 1]), tab()$events)
+     updateSelectInput(session, inputId = 'y2', choices = names(df2)[-1],
                        selected = "t_1Pr")
-     updateSelectInput(session, inputId = 'g2', choices = names(df2))
      DT::datatable(df2, editable = F,
                    extensions = 'Buttons',
                    options = list(dom = 'Bfrtip',
@@ -368,14 +385,14 @@ server <- function(input, output, session){
                                   paging = FALSE, searching = TRUE))
    })
 
-   output$graph2 <- renderPlot({
-     df2 <- data.frame(Group = mt()[, 1], tab()$events)
+   output$graph2 <- renderPlotly({
+     df2 <- data.frame(Group = as.factor(mt()[, 1]), tab()$events)
      if( length(unique(df2[, 1])) == 1 ) lev <- NA else lev <- factor(df2[, 1])
      if (nrow(df2) < ncol(df2[, -1])) {
        showNotification("n is too small for a biplot!", type = "error")
      } else {
        acp2 <- prcomp(scale(df2[, -1]))
-       fviz_pca_biplot(acp2,
+       p <- fviz_pca_biplot(acp2,
                        geom.var = c("arrow", "text"),
                        geom.ind = "text",
                        col.ind = "black",
@@ -385,27 +402,26 @@ server <- function(input, output, session){
                        col.var = "contrib", fill.var = "contrib",
                        legend.title = list(fill = "Group", color = "Contrib (%)"),
                        title = "")
+       ggplotly(p)
      }
-   }, width = 600, height = "auto", res = 80)
+   })
 
-   output$graph3 <- renderPlot({
-      w <- tab()$events
-      par(mfrow = c(ceiling(nrow(w)/4), 4), cex = 0.9, mar = c(2, 3, 2, 3))
-      for(i in 1:nrow(w)) {
-         perc = round(100*w[i, ]/sum(w[i, ]), 1)
-         lab = paste0(names(w[i, ]), " (", perc, "%)")
-         pie(w[i, ], radius = 0.9,
-            col = topo.colors(ncol(w)), main = rownames(w)[i],
-            labels = lab, cex.main = 0.9)
-      }
+   output$graph3 <- renderPlotly({
+      dtf <- tab()$events
+      df_den <<- data.frame(X = rownames(dtf), Group = as.factor(mt()[, 1]), dtf)
+      dados_m <- reshape2::melt(df_den, id.vars = 1:2)
+      p <- ggplot(dados_m, aes(y = variable, x = value, fill = Group)) +
+        geom_col(stats = "identity") + xlab("NWEi") +
+        facet_wrap(~X) +
+        theme_bw()
+      ggplotly(p)
    })
 
    observeEvent(input$best_gamlss2, {
      options(width=100)
      output$best_model2 <- renderTable({
-       df_den <<- data.frame(Group = mt()[, 1], tab()$events)
-       Group <- as.factor(df_den[, input$g])
-       fits <<- apply(df_den[, -1], 2, best_family2)
+       df_den <<- data.frame(tab()$events)
+       fits <<- apply(df_den, 2, best_family2)
        mods_gam <- lapply(fits, "[[", "fit")
        best_fits <- data.frame(
          Variable = names(mods_gam),
@@ -418,11 +434,25 @@ server <- function(input, output, session){
      }, digits = 4)
    })
 
+   observeEvent(input$bxp2, {
+     df_den <<- data.frame(Group = as.factor(mt()[, 1]), tab()$events)
+     y <- df_den$y <- df_den[, input$y2]
+     yname <- input$y2
+     output$boxplot2 <- renderPlotly({
+       p <- ggplot(df_den, aes(x = Group, y = y)) +
+         geom_boxplot() + ylab(yname) +
+         stat_summary(fun=mean, geom="point", shape=5, size = 3,
+                      show.legend = FALSE, color='black') +
+         coord_flip() + theme_bw()
+       ggplotly(p)
+     })
+   })
+
    observeEvent(input$fit_glm2, {
      pval_adj2 <- ifelse(input$tukey2 == TRUE, "tukey", "none")
-     df2 <<- data.frame(Group = mt()[, 1], tab()$events)
+     df2 <<- data.frame(Group = as.factor(mt()[, 1]), tab()$events)
      y <- df2$y <- df2[, input$y2]
-     Group <- df2$Group <- as.factor(df2[, input$g2])
+     Group <- df2$Group
      if(nlevels(Group) < 2) {
        showNotification("'Group' has only one level.
                       Go back to the WDi data table and specify more levels.",
@@ -443,7 +473,8 @@ server <- function(input, output, session){
        mod0 <- try(gamlss(y ~ 1, sigma.formula = eval(sigma2), data = df2,
                       family = get("familia2", envir = .GlobalEnv),
                       control = gamlss.control(trace = F)))
-       med2 <- try(emmeans::emmeans(mod2, "Group", type = "response"))
+       med2 <- try(emmeans::emmeans(mod2, "Group", type = "response",
+                                    level = input$conf1))
        comp_med2 <- try(pairs(med2, adjust = pval_adj2))
        if(inherits(mod2, "try-error") |
           inherits(mod0, "try-error") |
@@ -466,8 +497,10 @@ server <- function(input, output, session){
          })
          output$med2 <- renderPrint({ med2 })
          output$contrasts2 <- renderPrint({ comp_med2 })
-         output$graph23 <- renderPlot({ plot(med2, xlab = input$y2) +
-             theme_bw(base_size = 12) })
+         output$graph23 <- renderPlotly({
+           ggplotly(plot(med2, xlab = input$y2) +
+             theme_bw(base_size = 12))
+         })
        }
      }
    })
@@ -475,9 +508,8 @@ server <- function(input, output, session){
    # ----------------------------------------- duration per events
    output$durevents <-  DT::renderDT({
      den <- ifelse(input$unit == TRUE, 60, 1)
-     df_de <<- data.frame(Group = mt()[, 1], round(tab()$durevents/den, 2))
-     updateSelectInput(session, inputId = 'y_de', choices = names(df_de))
-     updateSelectInput(session, inputId = 'g_de', choices = names(df_de))
+     df_de <<- data.frame(Group = as.factor(mt()[, 1]), round(tab()$durevents/den, 2))
+     updateSelectInput(session, inputId = 'y_de', choices = names(df_de)[-1])
      DT::datatable(df_de, editable = F,
                    extensions = 'Buttons',
                    options = list(dom = 'Bfrtip',
@@ -487,14 +519,14 @@ server <- function(input, output, session){
                                   paging = FALSE, searching = TRUE))
    })
 
-   output$graph_de <- renderPlot({
-     df_de <- data.frame(Group = mt()[, 1], tab()$durevents)
+   output$graph_de <- renderPlotly({
+     df_de <- data.frame(Group = as.factor(mt()[, 1]), tab()$durevents)
      if( length(unique(df_de[, 1])) == 1 ) lev <- NA else lev <- factor(df_de[, 1])
      if (nrow(df_de) < ncol(df_de[, -1])) {
        showNotification("n is too small for a biplot!", type = "error")
      } else {
        acp_de <- prcomp(scale(df_de[, -1]))
-       fviz_pca_biplot(acp_de,
+       p <- fviz_pca_biplot(acp_de,
                        geom.var = c("arrow", "text"),
                        geom.ind = "text",
                        col.ind = "black",
@@ -504,28 +536,27 @@ server <- function(input, output, session){
                        col.var = "contrib", fill.var = "contrib",
                        legend.title = list(fill = "Group", color = "Contrib (%)"),
                        title = "")
+       ggplotly(p)
      }
-   }, width = 600, height = "auto", res = 80)
+   })
 
-   output$graph_pie_de <- renderPlot({
-     w <- tab()$durevents
-     par(mfrow = c(ceiling(nrow(w)/4), 4), cex = 0.9, mar = c(2, 3, 2, 3))
-     for(i in 1:nrow(w)) {
-       perc = round(100*w[i, ]/sum(w[i, ]), 1)
-       lab = paste0(names(w[i, ]), " (", perc, "%)")
-       pie(w[i, ], radius = 0.9,
-           col = topo.colors(ncol(w)), main = rownames(w)[i],
-           labels = lab, cex.main = 0.9)
-     }
+   output$graph_pie_de <- renderPlotly({
+     dtf <- tab()$durevents
+     df_den <<- data.frame(X = rownames(dtf), Group = as.factor(mt()[, 1]), dtf)
+     dados_m <- reshape2::melt(df_den, id.vars = 1:2)
+     p <- ggplot(dados_m, aes(y = variable, x = value, fill = Group)) +
+       geom_col(stats = "identity") + xlab("WDEi") +
+       facet_wrap(~X) +
+       theme_bw()
+     ggplotly(p)
    })
 
    observeEvent(input$best_gamlss_de, {
      options(width=100)
      output$best_model_de <- renderTable({
        den <- ifelse(input$unit == TRUE, 60, 1)
-       df_de <<- data.frame(Group = mt()[, 1], round(tab()$durevents/den, 2))
-       Group <- as.factor(df_de[, input$g])
-       fits <<- apply(df_de[, -1], 2, best_family)
+       df_de <<- data.frame(round(tab()$durevents/den, 2))
+       fits <<- apply(df_de, 2, best_family)
        mods_gam <- lapply(fits, "[[", "fit")
        best_fits <- data.frame(
          Variable = names(mods_gam),
@@ -538,12 +569,28 @@ server <- function(input, output, session){
      }, digits = 4)
    })
 
+   observeEvent(input$bxp3, {
+     den <- ifelse(input$unit == TRUE, 60, 1)
+     df_den <<- data.frame(Group = as.factor(mt()[, 1]),
+                           round(tab()$durevents/den, 2))
+     y <- df_den$y <- df_den[, input$y_de]
+     yname <- input$y_de
+     output$boxplot3 <- renderPlotly({
+       p <- ggplot(df_den, aes(x = Group, y = y)) +
+         geom_boxplot() + ylab(yname) +
+         stat_summary(fun=mean, geom="point", shape=5, size = 3,
+                      show.legend = FALSE, color='black') +
+         coord_flip() + theme_bw()
+       ggplotly(p)
+     })
+   })
+
    observeEvent(input$fit_glm_de, {
      den <- ifelse(input$unit == TRUE, 60, 1)
      pval_adj_de <- ifelse(input$tukey_de == TRUE, "tukey", "none")
-     df_de <<- data.frame(Group = mt()[, 1], round(tab()$durevents/den, 2))
+     df_de <<- data.frame(Group = as.factor(mt()[, 1]), round(tab()$durevents/den, 2))
      y <- df_de$y <- df_de[, input$y_de]
-     Group <- df_de$Group <- as.factor(df_de[, input$g_de])
+     Group <- df_de$Group
      if(nlevels(Group) < 2) {
        showNotification("'Group' has only one level.
                       Go back to the WDi data table and specify more levels.",
@@ -564,7 +611,8 @@ server <- function(input, output, session){
        mod0 <- try(gamlss(y ~ 1, sigma.formula = eval(sigma_de), data = df_de,
                           family = get("familia_de", envir = .GlobalEnv),
                           control = gamlss.control(trace = F)))
-       med_de <- try(emmeans::emmeans(mod_de, "Group", type = "response"))
+       med_de <- try(emmeans::emmeans(mod_de, "Group", type = "response",
+                                      level = input$conf1))
        comp_med_de <- try(pairs(med_de, adjust = pval_adj_de))
        if(inherits(mod_de, "try-error") |
           inherits(mod0, "try-error") |
@@ -587,18 +635,19 @@ server <- function(input, output, session){
          })
          output$med_de <- renderPrint({ med_de })
          output$contrasts_de <- renderPrint({ comp_med_de })
-         output$graph2_de <- renderPlot({ plot(med_de, xlab = input$y_de) +
-             theme_bw(base_size = 12) })
+         output$graph2_de <- renderPlotly({
+           ggplotly(plot(med_de, xlab = input$y_de) +
+             theme_bw(base_size = 12))
+         })
        }
      }
    })
 
    # ---------------------------------------- seq events
    output$seqevents <- DT::renderDT({
-     df3 <- data.frame(Group = mt()[, 1], tab()$seqevents)
+     df3 <- data.frame(Group = as.factor(mt()[, 1]), tab()$seqevents)
      updateSelectInput(session, inputId = 'y3', choices = names(df3),
                        selected = "t_1Pr")
-     updateSelectInput(session, inputId = 'g3', choices = names(df3))
      DT::datatable(df3, editable = F,
                    extensions = 'Buttons',
                    options = list(dom = 'Bfrtip',
@@ -630,7 +679,8 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                 theme = shinytheme("yeti"),
                 windowTitle = "INFEST 1.2",
                 useShinyjs(),
-                tabPanel("WDi", icon = icon("clock"),
+                div(style = "margin-top:-20px"),
+                tabPanel("Home / WDi", icon = icon("house-user"),
                     actionButton("hideSidebar", "Hide sidebar",
                                  style='padding:4px; font-size:80%;  background-color: lightyellow'),
                     actionButton("showSidebar", "Show sidebar",
@@ -639,7 +689,7 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                       div( id ="Sidebar",
                       sidebarPanel(width = 3,
                         fileInput("files", "Select one or more EPG files", multiple = TRUE),
-                        sliderInput("time_range", "Time trim (min.)",
+                        sliderInput("time_range", "Timeline trim (min.)",
                                     min = 0, max = 7200, value = c(0, 7200)),
                         checkboxInput("unit", "Convert sec. to min.", value = TRUE),
                         actionButton("run", "Run", icon = icon("r-project"),
@@ -656,12 +706,13 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                             h5("Waveform Duration by insect"),
                             h6("Warning: only column 'Group' should be edited!"),
                             rHandsontableOutput("duration")),
-                         tabPanel(icon("line-chart"),
+                         tabPanel(icon("chart-line"),
                              h5("Principal component biplot"),
-                             plotOutput("graph1")),
-                         tabPanel(icon("chart-pie"),
-                                  h5("Proportion of Waveform Duration by insect"),
-                                  plotOutput("graph12")),
+                             plotlyOutput("graph1")),
+                         tabPanel(icon("chart-bar"),
+                                  h5("Barplots of Waveform Duration by insect"),
+                                  plotlyOutput("graph12"),
+                                  h2(" ")),
                          tabPanel(icon("searchengin"),
                                   h5("Find the best fitting distriution for each variable"),
                                   h6("WARNING: this is done using only the intercept as predictor"),
@@ -671,8 +722,10 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                          tabPanel(icon("calculator"),
                                   h5("Fit 1-way GAMLSS model"),
                                   column(width = 3,
-                                    selectInput('g', 'Group factor', 'Group'),
+                                    tags$code("Group factor: 'Group'"),
                                     selectInput('y', 'Response variable', 't_1Pr'),
+                                    actionButton("bxp1", "Boxplot", icon = icon("r-project"),
+                                                 style="color: white; background-color: #2e6da4; border-color: white"),
                                     selectInput('family1', 'Distribution model',
                                                 choices = list("Gaussian" = "NO",
                                                                "Exponential" = "EXP",
@@ -690,12 +743,13 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                                  style="color: white; background-color: #2e6da4; border-color: white")
                                     ),
                                   column(width = 8,
+                                         plotlyOutput("boxplot1"),
                                          verbatimTextOutput("aic1"),
                                          verbatimTextOutput("model1"),
                                          verbatimTextOutput("med1"),
                                          verbatimTextOutput("contrasts1"),
-                                         plotOutput("graph13"),
-                                         tags$h1(" "), tags$h1(" "))
+                                         plotlyOutput("graph13")
+                                        )
                                   )
                          )
                       )
@@ -706,12 +760,13 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                       tabPanel(icon("table"),
                           h5("Number of Waveform Events by insect"),
                           DTOutput("events")),
-                       tabPanel(icon("line-chart"),
+                       tabPanel(icon("chart-line"),
                           h5("Principal component biplot"),
-                          plotOutput("graph2")),
-                       tabPanel(icon("chart-pie"),
-                          h5("Proportion of Waveform Events by insect"),
-                          plotOutput("graph3")),
+                          plotlyOutput("graph2")),
+                       tabPanel(icon("chart-bar"),
+                          h5("Barplots of Waveform Events by insect"),
+                          plotlyOutput("graph3"),
+                          h2(" ")),
                       tabPanel(icon("searchengin"),
                                h5("Find the best fitting distriution for each variable"),
                                h6("WARNING: this is done using only the intercept as predictor"),
@@ -721,8 +776,10 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                        tabPanel(icon("calculator"),
                                 h5("Fit 1-way GAMLSS model"),
                                 column(width = 3,
-                                       selectInput('g2', 'Group factor', 'Group'),
+                                       tags$code("Group factor: 'Group'"),
                                        selectInput('y2', 'Response variable', 'Z'),
+                                       actionButton("bxp2", "Boxplot", icon = icon("r-project"),
+                                                    style="color: white; background-color: #2e6da4; border-color: white"),
                                        selectInput('family2', 'Distribution model',
                                                    choices = list("Gaussian" = "NO",
                                                                   "Exponential" = "EXP",
@@ -745,26 +802,28 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                                     style="color: white; background-color: #2e6da4; border-color: white")
                                        ),
                                 column(width = 8,
+                                       plotlyOutput("boxplot2"),
                                        verbatimTextOutput("aic2"),
                                        verbatimTextOutput("model2"),
                                        verbatimTextOutput("med2"),
                                        verbatimTextOutput("contrasts2"),
-                                       plotOutput("graph23"),
+                                       plotlyOutput("graph23"),
                                        tags$h1(" "), tags$h1(" "))
                        )
                     )
                     ),
-                tabPanel("WDEi", icon = icon("clock-rotate-left"),
+                tabPanel("WDEi", icon = icon("hourglass-end"),
                              tabsetPanel(
                                tabPanel(icon("table"),
                                         h5("Waveform Duration per Event by insect"),
                                         DTOutput("durevents")),
-                               tabPanel(icon("line-chart"),
+                               tabPanel(icon("chart-line"),
                                         h5("Principal component biplot"),
-                                        plotOutput("graph_de")),
-                               tabPanel(icon("chart-pie"),
-                                        h5("Proportion of Waveform Duration per Event by insect"),
-                                        plotOutput("graph_pie_de")),
+                                        plotlyOutput("graph_de")),
+                               tabPanel(icon("chart-bar"),
+                                        h5("Barplots of Waveform Duration per Event by insect"),
+                                        plotlyOutput("graph_pie_de"),
+                                        h2(" ")),
                                tabPanel(icon("searchengin"),
                                         h5("Find the best fitting distriution for each variable"),
                                         h6("WARNING: this is done using only the intercept as predictor"),
@@ -774,8 +833,10 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                tabPanel(icon("calculator"),
                                         h5("Fit 1-way GAMLSS model"),
                                         column(width = 3,
-                                               selectInput('g_de', 'Group factor', 'Group'),
+                                               tags$code("Group factor: 'Group'"),
                                                selectInput('y_de', 'Response variable', 'Z'),
+                                               actionButton("bxp3", "Boxplot", icon = icon("r-project"),
+                                                            style="color: white; background-color: #2e6da4; border-color: white"),
                                                selectInput('family_de', 'Distribution model',
                                                            choices = list("Gaussian" = "NO",
                                                                           "Exponential" = "EXP",
@@ -793,11 +854,12 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                                             style="color: white; background-color: #2e6da4; border-color: white")
                                                ),
                                         column(width = 8,
+                                               plotlyOutput("boxplot3"),
                                                verbatimTextOutput("aic_de"),
                                                verbatimTextOutput("model_de"),
                                                verbatimTextOutput("med_de"),
                                                verbatimTextOutput("contrasts_de"),
-                                               plotOutput("graph2_de"),
+                                               plotlyOutput("graph2_de"),
                                                tags$h1(" "), tags$h1(" "))
                                )
                              )
@@ -822,4 +884,5 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
 
 # Run the app
 # runApp()   # to run locally
-shinyApp(ui = ui, server = server, options = list(launch.browser = TRUE))  # to run from a server
+shinyApp(ui = ui, server = server,
+         options = list(launch.browser = TRUE))  # to run from a server
