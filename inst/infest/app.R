@@ -234,7 +234,7 @@ server <- function(input, output, session){
     df_den <- data.frame(Group = dur()[, 1], round(dur()[, -1]/den, 2))
     updateSelectInput(session, inputId = 'y', choices = names(df_den)[-1],
                       selected = "t_1Pr")
-    rhandsontable(df_den)
+    rhandsontable(df_den, rowHeaderWidth=180)
   })
   mt <- reactive({
     DF = hot_to_r(input$duration)
@@ -325,10 +325,8 @@ server <- function(input, output, session){
                        type = "error", duration = 5)
     } else {
       if( any(y == 0) & !(input$family1 %in% zerofams) ) {
-        y <- df_den$y <- y + 0.1
-        showNotification("Positive values only are allowed for this
-                        distribution model,
-                        thus a constant 0.1 was added to all values.",
+        showNotification("Only positive values are accepted by this
+                        distribution model. See the 'About' menu.",
                          type = "warning", duration = 5)
       }
       assign("familia1", input$family1, envir = .GlobalEnv)
@@ -445,12 +443,12 @@ server <- function(input, output, session){
     y <- df_den$y <- df_den[, input$y2]
     yname <- input$y2
     output$boxplot2 <- renderPlotly({
-      p <- ggplot(df_den, aes(x = Group, y = y)) +
+      p2 <- ggplot(df_den, aes(x = Group, y = y)) +
         geom_boxplot() + ylab(yname) +
         stat_summary(fun=mean, geom="point", shape=5, size = 3,
                      show.legend = FALSE, color='black') +
         coord_flip() + theme_bw()
-      ggplotly(p)
+      ggplotly(p2)
     })
   })
 
@@ -465,10 +463,8 @@ server <- function(input, output, session){
                        type = "error", duration = 5)
     } else {
       if( any(y == 0) & !(input$family2 %in% zerofams)) {
-        y <- df2$y <- y + 1
-        showNotification("Positive values only are allowed for this
-                        distribution model,
-                        thus a constant 1 was added to all values.",
+        showNotification("Only positive values are accepted by this
+                        distribution model. See the 'About' menu.",
                          type = "warning", duration = 5)
       }
       assign("familia2", input$family2, envir = .GlobalEnv)
@@ -609,10 +605,8 @@ server <- function(input, output, session){
                        type = "error", duration = 5)
     } else {
       if( any(y == 0) & !(input$family_de %in% zerofams)) {
-        y <- df_de$y <- y + 0.1
-        showNotification("Positive values only are allowed for this
-                        distribution model,
-                        thus a constant 0.1 was added to all values.",
+        showNotification("Only positive values are accepted by this
+                        distribution model. See the 'About' menu.",
                          type = "warning", duration = 5)
       }
       assign("familia_de", input$family_de, envir = .GlobalEnv)
@@ -711,19 +705,25 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                              sliderInput("time_range", "Timeline trim (min.)",
                                                          min = 0, max = 7200, value = c(0, 7200)),
                                              checkboxInput("unit", "Convert sec. to min.", value = TRUE),
-                                             actionButton("run", "Run", icon = icon("r-project"),
-                                                          style="color: white; background-color: #2e6da4; border-color: white"),
-                                             tags$h1(),
-                                             numericInput("conf1", "Confidence level for Group ellipses",
-                                                          value = 0.95, min = 0, max = 1, step = 0.05,
-                                                          width = 100)
+                                             tags$hr(),
+                                             fluidRow(
+                                               column(6,
+                                               numericInput("conf1", "Confidence level",
+                                                            value = 0.95, min = 0, max = 1, step = 0.01,
+                                                            width = 95)),
+                                               column(3,
+                                               tags$br(),
+                                               actionButton("run", "Run", icon = icon("r-project"),
+                                                            style="color: white; background-color: #2e6da4; border-color: white")
+                                             )),
+                                             tags$small("Press F5/Refresh page to restart the app")
                                 )
                            ),
                            mainPanel(width = 9,
                                      tabsetPanel(
                                        tabPanel(icon("table"),
                                                 h5("Waveform Duration by insect"),
-                                                h6("Warning: only column 'Group' should be edited!"),
+                                                tags$code("WARNING: only the column 'Group' should be edited!"),
                                                 rHandsontableOutput("duration"),
                                                 tags$h1()),
                                        tabPanel(icon("chart-line"),
@@ -736,7 +736,7 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                                 tags$h1()),
                                        tabPanel(icon("searchengin"),
                                                 h5("Find the best fitting distriution for each variable"),
-                                                h6("WARNING: this is done using only the intercept as predictor"),
+                                                tags$code("WARNING: this is done using only the intercept as predictor"),
                                                 actionButton("best_gamlss1", "Run models", icon = icon("r-project"),
                                                              style="color: white; background-color: #2e6da4; border-color: white"),
                                                 tableOutput("best_model1")),
@@ -747,6 +747,7 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                                        selectInput('y', 'Response variable', 't_1Pr'),
                                                        actionButton("bxp1", "Boxplot", icon = icon("r-project"),
                                                                     style="color: white; background-color: #2e6da4; border-color: white"),
+                                                       tags$h2(),
                                                        selectInput('family1', 'Distribution model',
                                                                    choices = list("Gaussian" = "NO",
                                                                                   "Exponential" = "EXP",
@@ -800,7 +801,7 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                               tags$h1()),
                                      tabPanel(icon("searchengin"),
                                               h5("Find the best fitting distriution for each variable"),
-                                              h6("WARNING: this is done using only the intercept as predictor"),
+                                              tags$code("WARNING: this is done using only the intercept as predictor"),
                                               actionButton("best_gamlss2", "Run models", icon = icon("r-project"),
                                                            style="color: white; background-color: #2e6da4; border-color: white"),
                                               tableOutput("best_model2")),
@@ -811,6 +812,7 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                                      selectInput('y2', 'Response variable', 'Z'),
                                                      actionButton("bxp2", "Boxplot", icon = icon("r-project"),
                                                                   style="color: white; background-color: #2e6da4; border-color: white"),
+                                                     tags$h2(),
                                                      selectInput('family2', 'Distribution model',
                                                                  choices = list("Gaussian" = "NO",
                                                                                 "Exponential" = "EXP",
@@ -868,7 +870,7 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                               tags$h1()),
                                      tabPanel(icon("searchengin"),
                                               h5("Find the best fitting distriution for each variable"),
-                                              h6("WARNING: this is done using only the intercept as predictor"),
+                                              tags$code("WARNING: this is done using only the intercept as predictor"),
                                               actionButton("best_gamlss_de", "Run models", icon = icon("r-project"),
                                                            style="color: white; background-color: #2e6da4; border-color: white"),
                                               tableOutput("best_model_de")),
@@ -879,6 +881,7 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                                      selectInput('y_de', 'Response variable', 'Z'),
                                                      actionButton("bxp3", "Boxplot", icon = icon("r-project"),
                                                                   style="color: white; background-color: #2e6da4; border-color: white"),
+                                                     tags$h2(),
                                                      selectInput('family_de', 'Distribution model',
                                                                  choices = list("Gaussian" = "NO",
                                                                                 "Exponential" = "EXP",
