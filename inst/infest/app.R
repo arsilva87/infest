@@ -23,16 +23,39 @@ library(plotly)
 # --------------------------------------------------
 # A function to process the insect feeding events from the EPG system
 
+
 epg <- function(filesIn, time_trim = NULL)
 {
   files <- filesIn$name
   nfiles <- length(files)
 
-  ins <- list()
+  # aux function for reading .ANA files
+  stylet_codes <- c("1" = "np", "2" = "C", "3" = "E1e",
+                    "4" = "E1", "5" = "E2", "6" = "F",
+                    "7" = "G", "8" = "pd", "9" = "II-2",
+                    "10" = "II-3", "11" = "w11", "12" = "w12",
+                    "99" = "T")
+  read_ana <- function(f) {
+    d <- read.table(f, sep = "\t", fileEncoding = "UTF-16")
+    d$V1 <- stylet_codes[as.character(d$V1)] # waveform
+    d$V2 <- as.double(gsub(",", ".", d$V2))  # time
+    nr <- nrow(d)
+    dl <- lapply(1:nr, function(i) {
+      rbind(d$V1[i], d$V2[i])
+    })
+    unlist(dl)
+  }
+
+  f_ext <- tools::file_ext( tolower(filesIn$datapath) )
+  ins  <- list()
   for(i in 1:nfiles) {
-    ins[[i]] <- scan(filesIn$datapath[i],
-                     what = "double", sep = ",", flush = TRUE, quiet = TRUE)
-    ins[[i]] <- gsub(" ", "", ins[[i]], fixed = TRUE)
+    if(f_ext[i] == "ana") {
+      ins[[i]] <- read_ana(filesIn$datapath[i])
+    } else {
+      ins[[i]] <- scan(filesIn$datapath[i],
+                       what = "double", sep = ",", flush = TRUE, quiet = TRUE)
+      ins[[i]] <- gsub(" ", "", ins[[i]], fixed = TRUE)
+    }
   }
   names(ins) <- files
   events <- sapply(ins, length)/2
@@ -44,7 +67,7 @@ epg <- function(filesIn, time_trim = NULL)
     #warning("Error in file(s) ", files[o], ". Please check the line labels.")
     showNotification(paste(" Error (please check line labels) in file(s):",
                            paste(files[o], collapse = ", ")),
-                     type = "error", duration = 15)
+                     type = "error", duration = 10)
   }
 
   fcheck2 <- function(x) {
@@ -59,7 +82,7 @@ epg <- function(filesIn, time_trim = NULL)
     #warning("File(s) ", files[o2], " seem(s) to have labels sequentialy repeated.")
     showNotification(paste("The following file(s) seem(s) to have labels sequentially repeated :",
                            paste(files[o2], collapse = ", ")),
-                     type = "warning", duration = 15)
+                     type = "warning", duration = 10)
   }
 
   # time trim (optional)
@@ -80,7 +103,9 @@ epg <- function(filesIn, time_trim = NULL)
   fodd <- function(x) {
     n <- length(x)
     aux <- seq.int(1, n, by = 1)
-    x[aux %% 2 != 0]
+    y <- x[aux %% 2 != 0]
+    n2 <- n/2
+    y[-n2]
   }
   waves <- lapply(ins, fodd)
   levels <- lapply(waves, unique)
@@ -112,34 +137,37 @@ epg <- function(filesIn, time_trim = NULL)
   tabseq <- lapply(waves, tableseq)
   sumtabseq <- Reduce("+", tabseq)
 
-  # aux funct using even and odd indexes at each element of the list
+  # DURATION - aux funct using even and odd indexes at each element of the list
   nonprobe <- c("Z", "z", "np", "NP", "nP", "Np")
   evenodd <- function(x) {
     n <- length(x)
     aux <- seq.int(1, n, by = 1)
     waves <- factor(x[aux %% 2 != 0], levels = lev)
     cumtimes <- as.numeric(x[aux %% 2 == 0])
-    ost <- which(waves %in% nonprobe == TRUE)[1]
-    FP <- cumtimes[ost]
+    #ost <- which(waves %in% nonprobe == TRUE)[1]
+    #FP <- cumtimes[ost]
     times <- c(cumtimes[1], diff(cumtimes))
-    c(t_1Pr = FP, tapply(times, waves, FUN = sum))
+    #c(t_1Pr = FP, tapply(times, waves, FUN = sum))
+    tapply(times, waves, FUN = sum)
   }
-  times <- t(sapply(ins, evenodd))
-  times[is.na(times)] <- 0   # output and export csv
+  evenodd_ana <- function(x) {
+    n <- length(x)
+    aux <- seq.int(1, n, by = 1)
+    waves <- factor(x[aux %% 2 != 0], levels = lev)
+    cumtimes <- as.numeric(x[aux %% 2 == 0])
+    times <- diff(cumtimes)
+    n2 <- n/2
+    tapply(times, waves[-n2], FUN = sum)
+  }
+  if(f_ext[1] == "ana") {
+    times <- t(sapply(ins, evenodd_ana))
+  } else {
+    times <- t(sapply(ins, evenodd))
+  }
+  times[is.na(times)] <- 0
 
-  # Z plus Np
-  z_np1 <- colnames(times) %in% nonprobe
-  if(sum(z_np1) > 1) {
-    times <- as.data.frame(times)
-    times$Z_NP <- rowSums(times[, z_np1])
-  }
-  z_np2 <- colnames(waveevents) %in% nonprobe
-  if(sum(z_np2) > 1) {
-    waveevents <- as.data.frame(waveevents)
-    waveevents$Z_NP <- rowSums(waveevents[, z_np2])
-  }
-
-  de <- times[, -1]/waveevents
+  # duration per event
+  de <- times/waveevents
   de[is.na(de)] <- 0
 
   # output
@@ -371,6 +399,9 @@ server <- function(input, output, session){
           ggplotly(plot(med1, xlab = input$y) +
                      theme_bw(base_size = 12))
         })
+        observeEvent(input$wp_glm1, {
+          output$graph_wp1 <- renderPlot( gamlss::wp(mod1) )
+        })
       }
     }
   })
@@ -508,6 +539,9 @@ server <- function(input, output, session){
         output$graph23 <- renderPlotly({
           ggplotly(plot(med2, xlab = input$y2) +
                      theme_bw(base_size = 12))
+        })
+        observeEvent(input$wp_glm2, {
+          output$graph_wp2 <- renderPlot( gamlss::wp(mod2) )
         })
       }
     }
@@ -651,6 +685,9 @@ server <- function(input, output, session){
           ggplotly(plot(med_de, xlab = input$y_de) +
                      theme_bw(base_size = 12))
         })
+        observeEvent(input$wp_glm_de, {
+          output$graph_wp_de <- renderPlot( gamlss::wp(mod_de) )
+        })
       }
     }
   })
@@ -745,7 +782,7 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                                 column(width = 3,
                                                        tags$code("Group factor: 'Group'"),
                                                        selectInput('y', 'Response variable', 't_1Pr'),
-                                                       actionButton("bxp1", "Boxplot", icon = icon("r-project"),
+                                                       actionButton("bxp1", "Box-plot", icon = icon("r-project"),
                                                                     style="color: white; background-color: #2e6da4; border-color: white"),
                                                        tags$h2(),
                                                        selectInput('family1', 'Distribution model',
@@ -762,7 +799,8 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                                        checkboxInput("sigma1", "Model variances of 'Group'", value = FALSE),
                                                        checkboxInput("tukey", "Tukey's p-value adjustment", value = TRUE),
                                                        actionButton("fit_glm1", "Fit", icon = icon("r-project"),
-                                                                    style="color: white; background-color: #2e6da4; border-color: white")
+                                                                    style="color: white; background-color: #2e6da4; border-color: white"),
+                                                       actionButton("wp_glm1", "Worm-plot", icon = icon("r-project"))
                                                 ),
                                                 column(width = 8,
                                                        conditionalPanel(condition = "input.bxp1",
@@ -774,9 +812,10 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                                                         verbatimTextOutput("model1"),
                                                                         verbatimTextOutput("med1"),
                                                                         verbatimTextOutput("contrasts1"),
-                                                                        plotlyOutput("graph13"),
-                                                                        tags$h1()
-                                                       )
+                                                                        plotlyOutput("graph13")
+                                                       ),
+                                                       plotOutput("graph_wp1"),
+                                                       tags$h1()
                                                 )
                                        )
                                      )
@@ -810,7 +849,7 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                               column(width = 3,
                                                      tags$code("Group factor: 'Group'"),
                                                      selectInput('y2', 'Response variable', 'Z'),
-                                                     actionButton("bxp2", "Boxplot", icon = icon("r-project"),
+                                                     actionButton("bxp2", "Box-plot", icon = icon("r-project"),
                                                                   style="color: white; background-color: #2e6da4; border-color: white"),
                                                      tags$h2(),
                                                      selectInput('family2', 'Distribution model',
@@ -832,7 +871,8 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                                      checkboxInput("sigma2", "Model variances of 'Group'", value = FALSE),
                                                      checkboxInput("tukey2", "Tukey's p-value adjustment", value = TRUE),
                                                      actionButton("fit_glm2", "Fit", icon = icon("r-project"),
-                                                                  style="color: white; background-color: #2e6da4; border-color: white")
+                                                                  style="color: white; background-color: #2e6da4; border-color: white"),
+                                                     actionButton("wp_glm2", "Worm-plot", icon = icon("r-project"))
                                               ),
                                               column(width = 8,
                                                      conditionalPanel(condition = "input.bxp2",
@@ -844,9 +884,10 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                                                       verbatimTextOutput("model2"),
                                                                       verbatimTextOutput("med2"),
                                                                       verbatimTextOutput("contrasts2"),
-                                                                      plotlyOutput("graph23"),
-                                                                      tags$h1()
-                                                     )
+                                                                      plotlyOutput("graph23")
+                                                     ),
+                                                     plotOutput("graph_wp2"),
+                                                     tags$h1()
                                               )
                                      )
                                    )
@@ -879,7 +920,7 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                               column(width = 3,
                                                      tags$code("Group factor: 'Group'"),
                                                      selectInput('y_de', 'Response variable', 'Z'),
-                                                     actionButton("bxp3", "Boxplot", icon = icon("r-project"),
+                                                     actionButton("bxp3", "Box-plot", icon = icon("r-project"),
                                                                   style="color: white; background-color: #2e6da4; border-color: white"),
                                                      tags$h2(),
                                                      selectInput('family_de', 'Distribution model',
@@ -896,7 +937,8 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                                      checkboxInput("sigma_de", "Model variances of 'Group'", value = FALSE),
                                                      checkboxInput("tukey_de", "Tukey's p-value adjustment", value = TRUE),
                                                      actionButton("fit_glm_de", "Fit", icon = icon("r-project"),
-                                                                  style="color: white; background-color: #2e6da4; border-color: white")
+                                                                  style="color: white; background-color: #2e6da4; border-color: white"),
+                                                     actionButton("wp_glm_de", "Worm-plot", icon = icon("r-project"))
                                               ),
                                               column(width = 8,
                                                      conditionalPanel(condition = "input.bxp3",
@@ -908,9 +950,10 @@ ui = navbarPage(title = tags$head(img(src="infest_1_2.png", height = 65),
                                                                       verbatimTextOutput("model_de"),
                                                                       verbatimTextOutput("med_de"),
                                                                       verbatimTextOutput("contrasts_de"),
-                                                                      plotlyOutput("graph2_de"),
-                                                                      tags$h1()
-                                                     )
+                                                                      plotlyOutput("graph2_de")
+                                                     ),
+                                                     plotOutput("graph_wp_de"),
+                                                     tags$h1()
                                               )
                                      )
                                    )
