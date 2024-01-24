@@ -1,2 +1,2 @@
-# infest_app
-A shiny app for eletropenetrography (EPG) data analysis
+# INFEST
+INsect FEeding Behavior STatistics of eletropenetrography (EPG) data
