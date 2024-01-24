@@ -1,4 +1,3 @@
-# INFEST
 INsect FEeding Behavior STatistics of eletropenetrography (EPG) data
 
 # Install it as an usual R package
@@ -12,4 +11,4 @@ If needed, let R to update the package dependencies during installation. Once it
 ```r
 infest::infest()
 ```
-To know more, read 'INFEST User's Guide' (pdf).
+To know more, read [INFEST User's Guide](https://arsilva87.github.io/infest/INFEST_user_guide.pdf).
