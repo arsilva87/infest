@@ -104,8 +104,6 @@ epg <- function(filesIn, time_trim = NULL)
     n <- length(x)
     aux <- seq.int(1, n, by = 1)
     y <- x[aux %% 2 != 0]
-    n2 <- n/2
-    y[-n2]
   }
   waves <- lapply(ins, fodd)
   levels <- lapply(waves, unique)
