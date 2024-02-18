@@ -235,6 +235,38 @@ f_rmse <<- function(model) {
 zerofams <<- c("NO", "PARETO2", "ZAGA", "ZAIG",
                "PO", "NBII", "ZIP", "ZINBI", "PIG")
 
+
+# ----------------------------------------------------------
+# axu function for multiple binomial tests for transitions
+transmatrix_test <- function(x) {
+  x <- as.matrix(x)
+  nwaves <- ncol(x)
+  ntrans <- rowSums(x)
+  invnt <- diag(ntrans^-1)
+  prop_trans <- invnt %*% x
+  pvals <- sapply(1:nwaves, function(i) {
+    sapply(x[i,], function(y) {
+      nn <- ifelse(ntrans[i] == 0, 1, ntrans[i])
+      binom.test(y, nn, p = 1/(nwaves-1),
+                 alternative = "greater")$p.value
+    })
+  })
+  pvals_m <- round(t(pvals), 4)
+  dimnames(pvals_m) <- dimnames(prop_trans) <- dimnames(x)
+  out <- list(pvals = pvals_m, prop = prop_trans)
+  class(out) <- "transmatrix_test"
+  out
+}
+
+print.transmatrix_test <- function(x) {
+  nwaves <- ncol(x$pvals)
+  cat("\n  Multiple exact binomial tests for event transitions\n",
+      "\n  Matrix of p-values:\n")
+  print(x$pvals)
+  cat("\nAlternative hypothesis: true probability of transition is greater than ",
+      1/(nwaves-1), ", meaning: transition is not random\n", sep = "")
+}
+
 # ----------------------------------------------------------
 # aux function to automatically fit all models and gen. report
 
@@ -519,6 +551,19 @@ server <- function(input, output, session){
     tm <- matrix(df_tm, nrow = nrow(df_tm),
            dimnames = list(paste0("from_", lev),
                            paste0("to_", lev)))
+    output$trans_tests <- renderPrint(width = 400, {
+      pv <- transmatrix_test(tm)
+      output$prop_trans <- DT::renderDT({
+        DT::datatable(pv$prop, editable = F,
+                      extensions = 'Buttons',
+                      options = list(dom = 'Bfrtip',
+                                     digits = 4,
+                                     buttons = c('copy', 'csv', 'print'),
+                                     text = "Download",
+                                     paging = FALSE, searching = TRUE))
+      })
+      print(pv)
+    })
     DT::datatable(tm, editable = F,
                   extensions = 'Buttons',
                   options = list(dom = 'Bfrtip',
@@ -578,12 +623,20 @@ server <- function(input, output, session){
       }
     )
 
+    df_tm <- tab()$transmatrix
+    lev <- rownames(df_tm)
+    tm <- matrix(df_tm, nrow = nrow(df_tm),
+                 dimnames = list(paste0("from_", lev),
+                                 paste0("to_", lev)))
+    trans <- transmatrix_test(tm)
+
     output$downloadReport <- downloadHandler(
       filename = "infest_report.html",
       content = function(file) {
         rmarkdown::render("./www/report.Rmd",
                           params = list(mods = gams_l,
-                                        meds = means_l),
+                                        meds = means_l,
+                                        trans = trans),
                           output_file = file,
                           encoding = "UTF-8")
       }
@@ -716,6 +769,11 @@ ui = navbarPage(title = tags$head(img(src="infest_2_0.png", height = 65),
                                      tabPanel(icon("table"),
                                               h5("Transition matrix"),
                                               DTOutput("transmatrix"),
+                                              tags$br(),
+                                              h5("Transition probabilities"),
+                                              DTOutput("prop_trans"),
+                                              tags$br(),
+                                              verbatimTextOutput("trans_tests"),
                                               tags$h1()),
                                      tabPanel(icon("project-diagram"),
                                               h5("Network plot"),
