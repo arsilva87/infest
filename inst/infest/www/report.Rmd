@@ -1,0 +1,122 @@
+---
+title: "INFEST Report"
+subtitle: 'Statistical Analysis'
+output: 
+  html_document:
+    toc: true
+    theme: yeti
+params:
+  mods: NA
+  meds: NA
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, message = FALSE, 
+                      warning = FALSE, comment="")
+```
+
+
+****
+
+## <span style="color:darkcyan"> Summary
+
+```{r, results='asis', fig.height = 3, fig.width = 10}
+library(knitr)
+library(ggplot2)
+#options(width = 400)
+mods <- as.list(params$mods)
+fit_l <- lapply(mods, "[[", "fit")
+lrt_l <- lapply(mods, "[[", "lrt")
+out_d <- data.frame(variable = names(mods), 
+                    LRT = sapply(lrt_l, "[[", "X2"),
+                    Df = sapply(lrt_l, "[[", "dfr"),
+                    p_value = sapply(lrt_l, "[[", "pvalue"),
+                    distribution = sapply(lapply(mods, "[[", "family"), "[", 2),
+                    AIC = sapply(mods, "[[", "aic"),
+                    RMSE = sapply(mods, "[[", "rmse")
+)
+rownames(out_d) <- NULL
+kable(out_d, caption = "Likelihood Ratio Tests for the 'Group' factor")
+ggplot(out_d, aes(x = variable, y = p_value, fill = p_value)) + 
+  geom_bar(stat="identity") + ylim(0, 1) + ylab("p-value") +
+  scale_fill_gradient2(
+    low = "red", 
+    mid = "yellow", 
+    high = "royalblue", 
+    midpoint = 0.5,
+    guide="none") +
+  geom_hline(yintercept = 1-mods[[1]]$conf, linetype = 2, color = "red") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+cat("\n\n\\pagebreak\n")
+```
+
+
+## <span style="color:darkcyan"> Comparisons of means
+
+```{r, results = 'asis', fig.height = 4, fig.width = 10}
+library(knitr)
+library(gamlss)
+library(gridExtra)
+mods <- as.list(params$mods)
+dtf_l <- lapply(mods, "[[", "dtf")
+fit_l <- lapply(mods, "[[", "fit")
+means_l <- as.list(params$meds)
+comp._l <- lapply(means_l, function(x) {
+  try(multcomp::cld(x, Letters = letters, 
+                    adjust = mods[[1]]$adj, 
+                    level = mods[[1]]$conf, 
+                    alpha = 1-mods[[1]]$conf),
+      silent=TRUE)
+})
+comp_l <- lapply(means_l, function(x) {
+   try(pairs(x, adjust = mods[[1]]$adj), silent=TRUE)
+})
+for(i in 1:length(mods)) {
+  cat("\n### Variable:", names(mods[i]), "\n")
+  if(inherits(comp._l[[i]], "try-error")) {
+    cat(sprintf("<span style='color:red'> Estimation error"))  
+  } else {
+    print(kable(as.data.frame(comp._l[[i]]), 
+              caption = "Estimated marginal means, confidence intervals and pairwise comparisons")) 
+  }
+  if(inherits(comp_l[[i]], "try-error")) {
+    cat(sprintf("<span style='color:red'> Estimation error"))
+  } else {
+    print(kable(as.data.frame(comp_l[[i]]), 
+              caption = "Contrast tests"))
+  }
+  p1 <- boxplot_func(dtf_l[[i]]) + 
+    ggtitle("Box-plot") + ylab(names(mods[i]))
+  if(inherits(means_l[[i]], "try-error")) {
+    p2 <- boxplot_func(data.frame(y = dtf_l[[i]]$y, Group = 1)) +
+            ggtitle("Box-plot") + xlab("") + ylab(names(mods[i])) +
+            guides(y = "none")
+  } else {
+    p2 <- plot(means_l[[i]]) + xlab(names(mods[i])) +
+      theme_bw(base_size = 12) +
+      ggtitle(paste0(100*mods[[1]]$conf,
+                   "% confidence intervals for means\n"))
+  }
+  grid.arrange(p1, p2, ncol=2)
+  if(inherits(means_l[[i]], "try-error")) {
+    NULL
+  } else {
+    try(wp(fit_l[[i]]))
+    title("Worm-plot") 
+  }
+  cat("\n\n\\pagebreak\n")
+}
+```
+
+
+
+****
+<div class="logos"><img src="infest_2_0.png" width="125px" align="right"></div>
+
+<font size="1">  Date and time: `r Sys.time()`
+
+This document was automatically generated with [INFEST - Insect Feeding Behavior Statistics](https://arsilva87.github.io/infest/) v2.0 
+
+Powered by [Instituto Federal Goiano](https://www.ifgoiano.edu.br/home/index.php/urutai)  <img draggable="false" role="img" class="emoji" alt="🇧🇷" src="br-flag.svg" width="17px">
