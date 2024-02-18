@@ -19,7 +19,7 @@ library(ggplot2)
 library(reshape2)
 library(plotly)
 library(rmarkdown)
-
+library(multcompView)
 
 # --------------------------------------------------
 # A function to process the insect feeding events from the EPG system
@@ -216,7 +216,6 @@ epg <- function(filesIn, time_trim = NULL)
                            de,
                            DurFrsW,
                            NumPrFrsW)
-
   # output
   out <- list(duration = final_data,
               seqevents = seqevents,
