@@ -8,6 +8,7 @@ output:
 params:
   mods: NA
   meds: NA
+  trans: NA
 ---
 
 
@@ -110,7 +111,18 @@ for(i in 1:length(mods)) {
 }
 ```
 
+## <span style="color:darkcyan"> Event transitions
 
+```{r, results = 'asis', fig.height = 4, fig.width = 10}
+library(knitr)
+pv <- params$trans
+print(kable(as.data.frame(pv$prop), caption = "Transition probabilities"))
+print(kable(as.data.frame(pv$pvals), 
+            caption = "P-value matrix from multiple exact binomial tests for event transitions"))
+nwaves <- ncol(pv$pvals)
+cat("\nAlternative hypothesis: true probability of transition is greater than ",
+      1/(nwaves-1), ", meaning: transition is not random\n", sep = "")
+```
 
 ****
 <div class="logos"><img src="infest_2_0.png" width="125px" align="right"></div>
