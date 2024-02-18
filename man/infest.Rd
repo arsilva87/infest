@@ -7,21 +7,21 @@ infest()
 }
 
 \description{
-Processing of insect feeding data from the EPG system
+Processing and statistical analysis of insect feeding data from the EPG system
 }
 
 \details{
 \tabular{ll}{
 Package: \tab infest\cr
 Type: \tab Package\cr
-Version: \tab 1.2\cr
-Date: \tab 2024-01-15\cr
+Version: \tab 2.0\cr
+Date: \tab 2024-02-17\cr
 License: \tab GPL (>= 2)\cr
 }
 }
 
 \note{
-\emph{INFEST} is an ongoing project. All suggestions are welcome.
+\emph{INFEST} is an ongoing project. All suggestions are welcomed.
 }
 
 \author{
