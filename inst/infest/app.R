@@ -216,9 +216,7 @@ epg <- function(filesIn, time_trim = NULL)
                            de,
                            DurFrsW,
                            NumPrFrsW)
-  not_wave <- c(grep("w12", colnames(final_data)),
-                grep("T", colnames(final_data)))
-  final_data <- final_data[, -not_wave]
+
   # output
   out <- list(duration = final_data,
               seqevents = seqevents,
