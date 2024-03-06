@@ -8,17 +8,18 @@ output:
 params:
   mods: NA
   meds: NA
+  comp1: NA
+  all_mc: NA
+  comp2: NA
   trans: NA
 ---
-
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo=FALSE, message = FALSE, 
                       warning = FALSE, comment="")
 ```
 
-
-****
+------------------------------------------------------------------------
 
 ## <span style="color:darkcyan"> Summary
 
@@ -50,9 +51,11 @@ ggplot(out_d, aes(x = variable, y = p_value, fill = p_value)) +
   geom_hline(yintercept = 1-mods[[1]]$conf, linetype = 2, color = "red") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+all_mc <- params$all_mc
+kable(all_mc, caption = "Summary of multiple comparisons of means (± SE) of 'Group' levels")
+cat(sprintf("NA: An estimation error caused the marginal means not to be available. Use INFEST's modeling tool to fit a different model manually."))
 cat("\n\n\\pagebreak\n")
 ```
-
 
 ## <span style="color:darkcyan"> Comparisons of means
 
@@ -64,16 +67,8 @@ mods <- as.list(params$mods)
 dtf_l <- lapply(mods, "[[", "dtf")
 fit_l <- lapply(mods, "[[", "fit")
 means_l <- as.list(params$meds)
-comp._l <- lapply(means_l, function(x) {
-  try(multcomp::cld(x, Letters = letters, 
-                    adjust = mods[[1]]$adj, 
-                    level = mods[[1]]$conf, 
-                    alpha = 1-mods[[1]]$conf),
-      silent=TRUE)
-})
-comp_l <- lapply(means_l, function(x) {
-   try(pairs(x, adjust = mods[[1]]$adj), silent=TRUE)
-})
+comp._l <- as.list(params$comp1)
+comp_l <- as.list(params$comp2)
 for(i in 1:length(mods)) {
   cat("\n### Variable:", names(mods[i]), "\n")
   if(inherits(comp._l[[i]], "try-error")) {
@@ -124,11 +119,14 @@ cat("\nAlternative hypothesis: true probability of transition is greater than ",
       1/(nwaves-1), ", meaning: transition is not random\n", sep = "")
 ```
 
-****
-<div class="logos"><img src="infest_2_0.png" width="125px" align="right"></div>
+------------------------------------------------------------------------
 
-<font size="1">  Date and time: `r Sys.time()`
+::: logos
+<img src="infest_2_0.png" width="125px" align="right"/>
+:::
 
-This document was automatically generated with [INFEST - Insect Feeding Behavior Statistics](https://arsilva87.github.io/infest/) v2.0 
+<font size="1"> Date and time: `r Sys.time()`
 
-Powered by [Instituto Federal Goiano](https://www.ifgoiano.edu.br/home/index.php/urutai)  <img draggable="false" role="img" class="emoji" alt="🇧🇷" src="br-flag.svg" width="17px">
+This document was automatically generated with [INFEST - Insect Feeding Behavior Statistics](https://arsilva87.github.io/infest/) v2.0
+
+Powered by [Instituto Federal Goiano](https://www.ifgoiano.edu.br/home/index.php/urutai) <img src="br-flag.svg" alt="🇧🇷" class="emoji" draggable="false" role="img" width="17px"/>
