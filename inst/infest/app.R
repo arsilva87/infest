@@ -595,17 +595,17 @@ server <- function(input, output, session){
     variables <- tab()$duration
     dtf <- data.frame(Group = grupos, variables)
     pval_adj <- ifelse(input$tukey == TRUE, "tukey", "none")
-    gams_l <- list()
+    conf_lev <- input$conf1
     progress <- shiny::Progress$new()
     on.exit(progress$close())
     nvar <- ncol(dtf)-1
-    for(i in 2:ncol(dtf)) {
-      gams_l[[i-1]] <- best_family_full(y = dtf[, i], Group = dtf$Group,
-                      conf = input$conf1, adj = pval_adj)
+    gams_l <- lapply(2:ncol(dtf), function(i) {
+      out<- best_family_full(y = dtf[, i], Group = dtf$Group,
+                       conf = conf_lev, adj = pval_adj)
       progress$set(message = "Fitting models...", value = i/nvar,
                    detail = paste("variable", colnames(dtf)[i]))
-    }
-    showNotification(paste("DONE!"), duration = 3, type = "message")
+      out
+    })
     names(gams_l) <- colnames(dtf[, -1])
     fit_l <- lapply(gams_l, "[[", "fit")
     means_l <- lapply(fit_l, function(x) {
@@ -613,6 +613,32 @@ server <- function(input, output, session){
                            level = gams_l[[1]]$conf),
           silent = TRUE)
     })
+    comp._l <- lapply(means_l, function(x) {
+      try(multcomp::cld(x, Letters = letters,
+                        adjust = pval_adj,
+                        level = conf_lev,
+                        alpha = 1-conf_lev),
+          silent=TRUE)
+    })
+    comp_l <- lapply(means_l, function(x) {
+      try(pairs(x, adjust = pval_adj), silent=TRUE)
+    })
+    ff <- function(x) {
+      if(!inherits(x, "try-error")) {
+        x <- x[order(x$Group), ]
+        colnames(x)[2] <- "emmean"
+        m <- ifelse(x$emmean > 100, round(x$emmean), round(x$emmean, 2))
+        s <- ifelse(x$SE > 100, round(x$SE), round(x$SE, 2))
+        g <- gsub(" ", "", x$".group")
+        out <- paste(m, "±", s, g)
+        names(out) <- paste0("Group_", x$Group)
+      } else {
+        out <- rep(NA, nlevels(dtf$Group))
+      }
+      out
+    }
+    all_mc <- as.data.frame(t(sapply(comp._l, ff)))
+    showNotification(paste("DONE!"), duration = 3, type = "message")
 
     output$downloadData <- downloadHandler(
       filename = function() {
@@ -636,6 +662,9 @@ server <- function(input, output, session){
         rmarkdown::render("./www/report.Rmd",
                           params = list(mods = gams_l,
                                         meds = means_l,
+                                        comp1 = comp._l,
+                                        all_mc = all_mc,
+                                        comp2 = comp_l,
                                         trans = trans),
                           output_file = file,
                           encoding = "UTF-8")
