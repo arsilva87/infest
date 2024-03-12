@@ -36,7 +36,9 @@ epg <- function(filesIn, time_trim = NULL)
                     "10" = "II-3", "11" = "w11", "12" = "w12",
                     "99" = "T")
   read_ana <- function(f) {
-    d <- read.table(f, sep = "\t", fileEncoding = "UTF-16")
+    d <- try(read.table(f, sep = "\t", fileEncoding = "UTF-16"),
+             silent = TRUE)
+    if(inherits(d, "try-error")) d <- read.table(f, sep = "\t")
     d$V1 <- stylet_codes[as.character(d$V1)] # waveform
     d$V2 <- as.double(gsub(",", ".", d$V2))  # time
     nr <- nrow(d)
@@ -49,13 +51,13 @@ epg <- function(filesIn, time_trim = NULL)
   f_ext <- tools::file_ext( tolower(filesIn$datapath) )
   ins  <- list()
   for(i in 1:nfiles) {
-    if(f_ext[i] == "ana") {
-      ins[[i]] <- read_ana(filesIn$datapath[i])
-    } else {
+    ins[[i]] <- try(read_ana(filesIn$datapath[i]), silent = TRUE)
+    if(inherits(ins[[i]], "try-error")) {
       ins[[i]] <- scan(filesIn$datapath[i],
                        what = "double", sep = ",", flush = TRUE, quiet = TRUE)
       ins[[i]] <- gsub(" ", "", ins[[i]], fixed = TRUE)
     }
+
   }
   names(ins) <- files
   events <- sapply(ins, length)/2
@@ -298,7 +300,7 @@ lrt_func <- function(mod) {
 }
 
 best_family_full <- function(y, Group, conf = 0.95, adj = "none") {
-  fams <- c("NO", "EXP", "GA", "IGAMMA", "IG", "LOGNO",
+  fams <- c("NO", "EXP", "GA", "IGAMMA", "IG",
             "WEI", "PARETO2", "ZAGA", "ZAIG",
             "PO", "NBII", "ZIP", "ZINBI", "PIG")
   gams <- list()
@@ -601,7 +603,7 @@ server <- function(input, output, session){
     nvar <- ncol(dtf)-1
     gams_l <- lapply(2:ncol(dtf), function(i) {
       out<- best_family_full(y = dtf[, i], Group = dtf$Group,
-                       conf = conf_lev, adj = pval_adj)
+                             conf = conf_lev, adj = pval_adj)
       progress$set(message = "Fitting models...", value = i/nvar,
                    detail = paste("variable", colnames(dtf)[i]))
       out
@@ -659,6 +661,7 @@ server <- function(input, output, session){
     output$downloadReport <- downloadHandler(
       filename = "infest_report.html",
       content = function(file) {
+        showNotification("Please wait", duration = 2, type = "warning")
         rmarkdown::render("./www/report.Rmd",
                           params = list(mods = gams_l,
                                         meds = means_l,
@@ -739,7 +742,6 @@ ui = navbarPage(title = tags$head(img(src="infest_2_0.png", height = 65),
                                                                                   "Gamma" = "GA",
                                                                                   "Inverse Gamma" = "IGAMMA",
                                                                                   "Inverse Gaussian" = "IG",
-                                                                                  "Lognormal" = "LOGNO",
                                                                                   "Weibull" = "WEI",
                                                                                   "Pareto type 2" = "PARETO2",
                                                                                   "Zero adjusted Gamma" = "ZAGA",
