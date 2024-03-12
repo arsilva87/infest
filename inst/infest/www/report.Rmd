@@ -51,6 +51,7 @@ ggplot(out_d, aes(x = variable, y = p_value, fill = p_value)) +
   geom_hline(yintercept = 1-mods[[1]]$conf, linetype = 2, color = "red") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+cat("\n\n\\pagebreak\n")
 all_mc <- params$all_mc
 kable(all_mc, caption = "Summary of multiple comparisons of means (± SE) of 'Group' levels")
 cat(sprintf("NA: An estimation error caused the marginal means not to be available. Use INFEST's modeling tool to fit a different model manually."))
