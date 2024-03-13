@@ -20,6 +20,7 @@ library(reshape2)
 library(plotly)
 library(rmarkdown)
 library(multcompView)
+library(shinybusy)
 
 # --------------------------------------------------
 # A function to process the insect feeding events from the EPG system
@@ -592,6 +593,9 @@ server <- function(input, output, session){
   # --------------------------------------------------------------
   # statistical report
   observeEvent(input$report, {
+    shinybusy::show_modal_spinner(spin = "fulfilling-square",
+                                  color = "#2e6da4",
+                                  text = "Finding the best-fitting models")
     grupos <- as.factor(mt()[, 1])
     req(nlevels(grupos) > 1)
     variables <- tab()$duration
@@ -640,7 +644,8 @@ server <- function(input, output, session){
       out
     }
     all_mc <- as.data.frame(t(sapply(comp._l, ff)))
-    showNotification(paste("DONE!"), duration = 3, type = "message")
+    shinybusy::remove_modal_spinner()
+    showNotification("DONE!", duration = 2, type = "message")
 
     output$downloadData <- downloadHandler(
       filename = function() {
@@ -661,7 +666,9 @@ server <- function(input, output, session){
     output$downloadReport <- downloadHandler(
       filename = "infest_report.html",
       content = function(file) {
-        showNotification("Please wait", duration = 2, type = "warning")
+        shinybusy::show_modal_spinner(spin = "self-building-square",
+                                      color = "#2e6da4",
+                                      text = "Generating report")
         rmarkdown::render("./www/report.Rmd",
                           params = list(mods = gams_l,
                                         meds = means_l,
@@ -671,6 +678,8 @@ server <- function(input, output, session){
                                         trans = trans),
                           output_file = file,
                           encoding = "UTF-8")
+        shinybusy::remove_modal_spinner()
+        showNotification("DONE!", duration = 2, type = "message")
       }
     )
   })
@@ -780,6 +789,7 @@ ui = navbarPage(title = tags$head(img(src="infest_2_0.png", height = 65),
                 ),
                 # Report --------------------------------------------
                 tabPanel("Stats report", icon = icon("person-running"),
+                         #shinybusy::add_busy_spinner(spin = "orbit", position = "bottom-right"),
                          h5("NO SWEAT!"),
                          h5("Find the best-fitting model for each response variable
                             as a function of the factor 'Group', then generate and
