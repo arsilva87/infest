@@ -15,7 +15,7 @@ Processing and statistical analysis of insect feeding data from the EPG system
 Package: \tab infest\cr
 Type: \tab Package\cr
 Version: \tab 2.0\cr
-Date: \tab 2024-02-17\cr
+Date: \tab 2024-03-12\cr
 License: \tab GPL (>= 2)\cr
 }
 }
