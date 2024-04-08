@@ -39,7 +39,8 @@ epg <- function(filesIn, time_trim = NULL)
   read_ana <- function(f) {
     d <- try(read.table(f, sep = "\t", fileEncoding = "UTF-16"),
              silent = TRUE)
-    if(inherits(d, "try-error")) d <- read.table(f, sep = "\t")
+    if(inherits(d, "try-error")) d <- read.table(f, sep = "\t",
+                                                 fileEncoding = "UTF-8")
     d$V1 <- stylet_codes[as.character(d$V1)] # waveform
     d$V2 <- as.double(gsub(",", ".", d$V2))  # time
     nr <- nrow(d)
@@ -304,19 +305,21 @@ best_family_full <- function(y, Group, conf = 0.95, adj = "none") {
   fams <- c("NO", "EXP", "GA", "IGAMMA", "IG",
             "WEI", "PARETO2", "ZAGA", "ZAIG",
             "PO", "NBII", "ZIP", "ZINBI", "PIG")
-  gams <- list()
-  nm <- 2*length(fams)
-  d <<- data.frame(y = y, Group = Group)
-  for(i in 1:nm) {
-    gams[[i]] <- try(gamlss(y ~ Group, sigma.formula = ~1,
-                            family = fams[i], data = na.omit(d),
-                            trace=FALSE),
-                     silent = TRUE)
-    gams[[i+1]] <- try(gamlss(y ~ Group, sigma.formula = ~Group,
-                              family = fams[i], data = na.omit(d),
-                              trace=FALSE),
-                       silent = TRUE)
+  m1 <- m2 <- list()
+  nf <- length(fams)
+  d <- data.frame(y = y, Group = Group)
+  d <<- d[complete.cases(d), ]
+  for(i in 1:nf) {
+    m1[[i]] <- try(gamlss(y ~ Group, sigma.formula = ~1,
+                          family = fams[i], data = d,
+                          trace=FALSE),
+                   silent = TRUE)
+    m2[[i]] <- try(gamlss(y ~ Group, sigma.formula = ~Group,
+                          family = fams[i], data = d,
+                          trace=FALSE),
+                   silent = TRUE)
   }
+  gams <- c(m1, m2)
   aics <- sapply(gams, function(w) {
     ifelse(inherits(w, "try-error"), NA, AIC(w))
   })
@@ -338,7 +341,7 @@ best_family_full <- function(y, Group, conf = 0.95, adj = "none") {
     aic <- NA
     rmse <- NA
   }
-  out <- list(dtf = data.frame(y, Group),
+  out <- list(dtf = d,
               fit = mod,
               lrt = lrt,
               conf = conf,
@@ -471,12 +474,14 @@ server <- function(input, output, session){
       }
       assign("familia1", input$family1, envir = .GlobalEnv)
       sigma1 <- ifelse(input$sigma1 == TRUE, expression(~Group), expression(~1))
+      df_den2 <- df_den[, c("y", "Group")]
+      df_den2 <<- df_den2[complete.cases(df_den2), ]
       mod1 <- try(gamlss(y ~ Group, sigma.formula = eval(sigma1),
-                         data = na.omit(df_den),
+                         data = df_den2,
                          family = get("familia1", envir = .GlobalEnv),
                          control = gamlss.control(trace = F)))
       mod0 <- try(gamlss(y ~ 1, sigma.formula = eval(sigma1),
-                         data = na.omit(df_den),
+                         data = df_den2,
                          family = get("familia1", envir = .GlobalEnv),
                          control = gamlss.control(trace = F)))
       med1 <- try(emmeans::emmeans(mod1, "Group", type = "response",
@@ -590,6 +595,19 @@ server <- function(input, output, session){
          edge.color = gray(1-w), edge.arrow.size = 1)
   })
 
+  output$downloadData <- downloadHandler(
+    filename = function() {
+      "infest_data.csv"
+    },
+    content = function(file) {
+      grupos <- as.factor(mt()[, 1])
+      req(nlevels(grupos) > 1)
+      variables <- tab()$duration
+      dtf <- data.frame(Group = grupos, variables)
+      write.csv(dtf, file, row.names = TRUE)
+    }
+  )
+
   # --------------------------------------------------------------
   # statistical report
   observeEvent(input$report, {
@@ -646,15 +664,6 @@ server <- function(input, output, session){
     all_mc <- as.data.frame(t(sapply(comp._l, ff)))
     shinybusy::remove_modal_spinner()
     showNotification("DONE!", duration = 2, type = "message")
-
-    output$downloadData <- downloadHandler(
-      filename = function() {
-        "infest_data.csv"
-      },
-      content = function(file) {
-        write.csv(dtf, file, row.names = TRUE)
-      }
-    )
 
     df_tm <- tab()$transmatrix
     lev <- rownames(df_tm)
