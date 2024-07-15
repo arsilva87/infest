@@ -308,7 +308,7 @@ best_family_full <- function(y, Group, conf = 0.95, adj = "none") {
   m1 <- m2 <- list()
   nf <- length(fams)
   d <- data.frame(y = y, Group = Group)
-  d <<- d[complete.cases(d), ]
+  d <- d[complete.cases(d), ]
   for(i in 1:nf) {
     m1[[i]] <- try(gamlss(y ~ Group, sigma.formula = ~1,
                           family = fams[i], data = d,
