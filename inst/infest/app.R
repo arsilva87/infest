@@ -309,13 +309,17 @@ best_family_full <- function(y, Group, conf = 0.95, adj = "none") {
   nf <- length(fams)
   d <- data.frame(y = y, Group = Group)
   d <- d[complete.cases(d), ]
+  assign("ddd", d, envir = .GlobalEnv)
   for(i in 1:nf) {
-    m1[[i]] <- try(gamlss(y ~ Group, sigma.formula = ~1,
-                          family = fams[i], data = d,
+    dat <- get("ddd", envir = .GlobalEnv)
+    m1[[i]] <- try(gamlss(dat$y ~ dat$Group, sigma.formula = ~1,
+                          family = fams[i],
+                          #data = get("ddd", envir = .GlobalEnv),
                           trace=FALSE),
                    silent = TRUE)
-    m2[[i]] <- try(gamlss(y ~ Group, sigma.formula = ~Group,
-                          family = fams[i], data = d,
+    m2[[i]] <- try(gamlss(dat$y ~ dat$Group, sigma.formula = ~Group,
+                          family = fams[i],
+                          #data = get("ddd", envir = .GlobalEnv),
                           trace=FALSE),
                    silent = TRUE)
   }
@@ -624,8 +628,8 @@ server <- function(input, output, session){
     on.exit(progress$close())
     nvar <- ncol(dtf)-1
     gams_l <- lapply(2:ncol(dtf), function(i) {
-      out<- best_family_full(y = dtf[, i], Group = dtf$Group,
-                             conf = conf_lev, adj = pval_adj)
+      out<- try(best_family_full(y = dtf[, i], Group = dtf$Group,
+                             conf = conf_lev, adj = pval_adj))
       progress$set(message = "Fitting models...", value = i/nvar,
                    detail = paste("variable", colnames(dtf)[i]))
       out
