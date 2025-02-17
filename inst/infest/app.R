@@ -5,6 +5,32 @@
 #                  "http://github.com/kassambara/",
 #                  "https://cran.r-project.org/"))
 
+packs <- c("htmltools",
+           "shinythemes",
+           "igraph",
+           "factoextra",
+           "DT",
+           "rhandsontable",
+           "emmeans",
+           "shinyjs",
+           "gamlss",
+           "ggeffects",
+           "ggplot2",
+           "reshape2",
+           "plotly",
+           "rmarkdown",
+           "multcomp",
+           "multcompView",
+           "shinybusy")
+
+sapply(packs,
+       function(y) {
+         if(!require(y)) {
+           install.packages(y)
+         }
+       }
+)
+
 library(htmltools)
 library(shinythemes)
 library(igraph)
