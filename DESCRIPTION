@@ -1,12 +1,12 @@
 Package: infest
 Type: Package
 Title: INFEST: Insect Feeding Behavior Statistics
-Version: 2.0
-Date: 2024-03-12
+Version: 2.01
+Date: 2025-02-17
 LazyLoad: yes
 LazyData: yes
 Author: Anderson Rodrigo da Silva
 Maintainer: Anderson Rodrigo da Silva <anderson.silva@ifgoiano.edu.br>
-Depends: shiny, shinythemes, htmltools, DT, rhandsontable, shinyjs, gamlss, emmeans, ggeffects, igraph, factoextra, reshape2, plotly, rmarkdown, multcompView, shinybusy
+Depends: shiny, shinythemes, htmltools, DT, rhandsontable, shinyjs, rmarkdown, shinybusy, gamlss, emmeans, estimability, multcomp, multcompView, ggeffects, igraph, factoextra, reshape2, plotly
 Description: Processing and statistical analysis of insect feeding behavior data from the EPG (electropenetrography) system.
 License: GPL (>= 2)
