@@ -5,48 +5,24 @@
 #                  "http://github.com/kassambara/",
 #                  "https://cran.r-project.org/"))
 
-packs <- c("htmltools",
-           "shinythemes",
-           "igraph",
-           "factoextra",
-           "DT",
-           "rhandsontable",
-           "emmeans",
-           "shinyjs",
-           "gamlss",
-           "ggeffects",
-           "ggplot2",
-           "reshape2",
-           "plotly",
-           "rmarkdown",
-           "multcomp",
-           "multcompView",
-           "shinybusy")
-
-sapply(packs,
-       function(y) {
-         if(!require(y)) {
-           install.packages(y)
-         }
-       }
-)
-
 library(htmltools)
 library(shinythemes)
-library(igraph)
-library(factoextra)
+library(shinyjs)
 library(DT)
 library(rhandsontable)
-library(emmeans)
-library(shinyjs)
+library(rmarkdown)
+library(shinybusy)
 library(gamlss)
+library(emmeans)
+library(estimability)
+library(multcomp)
+library(multcompView)
 library(ggeffects)
 library(ggplot2)
 library(reshape2)
 library(plotly)
-library(rmarkdown)
-library(multcompView)
-library(shinybusy)
+library(igraph)
+library(factoextra)
 
 # --------------------------------------------------
 # A function to process the insect feeding events from the EPG system
@@ -729,7 +705,7 @@ server <- function(input, output, session){
 ui = navbarPage(title = tags$head(img(src="infest_2_0.png", height = 65),
                                   "Insect Feeding Behavior Statistics"),
                 theme = shinytheme("yeti"),
-                windowTitle = "INFEST 2.0",
+                windowTitle = "INFEST 2.01",
                 useShinyjs(),
                 div(style = "margin-top:-20px"),
                 # response variables  ------------------------------------------------------
