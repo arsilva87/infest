@@ -128,6 +128,6 @@ cat("\nAlternative hypothesis: true probability of transition is greater than ",
 
 <font size="1"> Date and time: `r Sys.time()`
 
-This document was automatically generated with [INFEST - Insect Feeding Behavior Statistics](https://arsilva87.github.io/infest/) v2.01
+This document was automatically generated with [INFEST - Insect Feeding Behavior Statistics](https://arsilva87.github.io/infest/) v2.02
 
 Powered by [Instituto Federal Goiano](https://www.ifgoiano.edu.br/home/index.php/urutai) <img src="br-flag.svg" alt="🇧🇷" class="emoji" draggable="false" role="img" width="17px"/>

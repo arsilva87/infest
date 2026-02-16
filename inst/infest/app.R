@@ -155,7 +155,11 @@ epg <- function(filesIn, time_trim = NULL)
   tran_mat <- Reduce("+", tran_mats)
 
   # DURATION - aux funct using even and odd indexes at each element of the list
-  nonprobe <- c("Z", "z", "np", "NP", "nP", "Np")
+  #nonprobe <- c("Z", "z", "np", "NP", "nP", "Np")
+  w_nonprobe <- regexpr(c("np", "z"), lev, ignore.case = TRUE) > 0
+  nonprobe <- lev[w_nonprobe]
+  probe_waves <- lev[!(lev %in% nonprobe)]
+
   evenodd <- function(x, arq) {
     n <- length(x)
     aux <- seq.int(1, n, by = 1)
@@ -205,23 +209,22 @@ epg <- function(filesIn, time_trim = NULL)
   DurFrsW <- t(sapply(ins, DurFS_func, pos = 1, arq = f_ext[1]))
   DurFrsW[is.na(DurFrsW)] <- 0
 
-  # number of probes to first event W
-  NumPrFrsW_func <- function(x) {
-    out <- sapply(lev, function(w) {
-      which(x %in% w)[1] - 1
-    })
-    onp <- which(names(out) %in% nonprobe)[1]
-    out <- out[-onp]
-    names(out) <- paste0("NumPrFrs_", names(out))
+  # number of events to first event W
+  NumEvFrsW_fun <- function(x) {
+    out <- sapply(probe_waves, function(w) {
+      r <- which(w == x)[1] - 1
+      names(r) <- paste0("NumEvFrs_", w)
+      r
+    }, USE.NAMES = FALSE)
     out
   }
-  NumPrFrsW <- t(sapply(waves, NumPrFrsW_func))
+  NumEvFrsW <- t(sapply(waves, NumEvFrsW_fun))
 
   final_data <- data.frame(times,
                            waveevents,
                            de,
                            DurFrsW,
-                           NumPrFrsW)
+                           NumEvFrsW)
   # output
   out <- list(duration = final_data,
               seqevents = seqevents,
@@ -624,6 +627,8 @@ server <- function(input, output, session){
     req(nlevels(grupos) > 1)
     variables <- tab()$duration
     dtf <- data.frame(Group = grupos, variables)
+    w_col <- apply(dtf, 2, function(x) all(!is.na(x)))
+    dtf <- dtf[, w_col]
     pval_adj <- ifelse(input$tukey == TRUE, "tukey", "none")
     conf_lev <- input$conf1
     progress <- shiny::Progress$new()
@@ -705,7 +710,7 @@ server <- function(input, output, session){
 ui = navbarPage(title = tags$head(img(src="infest_2_0.png", height = 65),
                                   "Insect Feeding Behavior Statistics"),
                 theme = shinytheme("yeti"),
-                windowTitle = "INFEST 2.01",
+                windowTitle = "INFEST 2.02",
                 useShinyjs(),
                 div(style = "margin-top:-20px"),
                 # response variables  ------------------------------------------------------
