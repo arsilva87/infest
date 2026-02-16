@@ -627,8 +627,8 @@ server <- function(input, output, session){
     req(nlevels(grupos) > 1)
     variables <- tab()$duration
     dtf <- data.frame(Group = grupos, variables)
-    w_col <- apply(dtf, 2, function(x) all(!is.na(x)))
-    dtf <- dtf[, w_col]
+    #w_col <- apply(dtf, 2, function(x) all(!is.na(x)))
+    #dtf <- dtf[, w_col]
     pval_adj <- ifelse(input$tukey == TRUE, "tukey", "none")
     conf_lev <- input$conf1
     progress <- shiny::Progress$new()
