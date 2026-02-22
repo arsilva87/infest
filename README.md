@@ -1,8 +1,9 @@
 INsect FEeding Behavior STatistics of eletropenetrography (EPG) data
 
-# Try the newest INFEST v2.02 now!
+# Try the new INFEST Light online!
+Visit [arsilva87.github.io/infest/](https://arsilva87.github.io/infest/)
 
-# Install it as an usual R package
+## Install INFEST v2.02 it as an usual R package
 Open up the R console and execute the following command lines:
 ```r
 if (!require("devtools", quietly = TRUE))
