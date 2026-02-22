@@ -1,8 +1,9 @@
 
 # The INFEST app: insect feeding behavior statistics, the light version
-# shinylive::export(appdir = "inst/infest", destdir = "docs")
+# shinylive::export(appdir = getwd(), destdir = "docs")
 # httpuv::runStaticServer("docs")
 
+library(shiny)
 library(htmltools)
 library(gamlss)
 
@@ -276,12 +277,12 @@ best_family_full <- function(y, Group, conf = 0.95, adj = "none") {
   if(length(o_aic) == 0) o_aic = 1
   mod <- gams[[o_aic]]
   if(!inherits(mod, "try-error")) {
-     mod$family <- gams[[o_aic]]$family
-     mod$call[4] <- mod$family[1]
-     lrt <- lrt_func(mod)
-     dfr <- mod$df.residual
-     aic <- mod$aic
-     rmse <- f_rmse(mod)
+    mod$family <- gams[[o_aic]]$family
+    mod$call[4] <- mod$family[1]
+    lrt <- lrt_func(mod)
+    dfr <- mod$df.residual
+    aic <- mod$aic
+    rmse <- f_rmse(mod)
   } else {
     mod$family <- c(NA, NA)
     mod$call[4] <- NA
@@ -347,25 +348,9 @@ server <- function(input, output, session){
     DF
   })
 
-  output$downloadData <- downloadHandler(
-    filename = function() {
-      "infest_data.csv"
-    },
-    content = function(file) {
-      grupos <- as.factor(mt()[, 1])
-      req(nlevels(grupos) > 1)
-      variables <- tab()$duration
-      dtf <- data.frame(Group = grupos, variables)
-      write.csv(dtf, file, row.names = TRUE)
-    }
-  )
-
   # --------------------------------------------------------------
   # statistical report
   observeEvent(input$report, {
-    shinybusy::show_modal_spinner(spin = "fulfilling-square",
-                                  color = "#2e6da4",
-                                  text = "Finding the best-fitting models")
     grupos <- as.factor(mt()[, 1])
     req(nlevels(grupos) > 1)
     variables <- tab()$duration
@@ -377,7 +362,7 @@ server <- function(input, output, session){
     nvar <- ncol(dtf)-1
     gams_l <- lapply(2:ncol(dtf), function(i) {
       out<- try(best_family_full(y = dtf[, i], Group = dtf$Group,
-                             conf = conf_lev, adj = pval_adj))
+                                 conf = conf_lev, adj = pval_adj))
       progress$set(message = "Fitting models...", value = i/nvar,
                    detail = paste("variable", colnames(dtf)[i]))
       out
@@ -410,9 +395,11 @@ server <- function(input, output, session){
       }
       out
     }
-    all_mc <- as.data.frame(t(sapply(comp._l, ff)))
+    all_mc. <- as.data.frame(t(sapply(comp._l, ff)))
+    all_mc <- data.frame(variable = rownames(all_mc.), all_mc.)
+
     comp_l <- lapply(means_l, function(x) {
-      try(pairs(x, adjust = pval_adj), 
+      try(pairs(x, adjust = pval_adj),
           silent=TRUE)
     })
     ff2 <- function(x) {
@@ -430,14 +417,13 @@ server <- function(input, output, session){
       out
     }
     comp_l2 <- lapply(comp_l, ff2)
-    all_mc2 <- do.call(rbind, comp_l2)
-
-    shinybusy::remove_modal_spinner()
+    all_mc2. <- do.call(rbind, comp_l2)
+    all_mc2 <- data.frame(variable = rownames(all_mc2.), all_mc2.)
     showNotification("DONE!", duration = 2, type = "message")
 
     # output report
     lrt_l <- lapply(gams_l, "[[", "lrt")
-    out_d <- data.frame(variable = names(gams_l), 
+    out_d <- data.frame(variable = names(gams_l),
                         LRT = sapply(lrt_l, "[[", "X2"),
                         Df = sapply(lrt_l, "[[", "dfr"),
                         p_value = sapply(lrt_l, "[[", "pvalue"),
@@ -447,34 +433,43 @@ server <- function(input, output, session){
     )
     rownames(out_d) <- NULL
 
-    output$downloadReport <- downloadHandler(
-      filename = "infest_report.html",
-      content = function(file) {
-        report_html <- tags$html(
-          tags$head(tags$title("INFEST Statistical Report")),
-          tags$body(
-            h1("Statistical Analysis Report"),
-            h2("Likelihood Ratio Tests for the 'Group' factor"),
-            HTML(knitr::kable(out_d, format = "html")),
-            h2("Summary of multiple comparisons of means (± SE) of 'Group' levels"),
-            HTML(knitr::kable(all_mc, format = "html")),
-            h2("Pairwise comparisons of means of 'Group' levels"),
-            HTML(knitr::kable(all_mc2, format = "html")),
-            tags$footer(p("This document was automatically generated with INFEST - Insect Feeding Behavior Statistics v2.02"),
-                        p("Date and time:", Sys.time()))
-          )
+    # A helper function to turn a data frame into a pure HTML table string
+    df_to_html <- function(df) {
+      thead <- paste0("<th>", names(df), "</th>", collapse = "")
+      tbody <- apply(df, 1, function(x) {
+        paste0("<td>", x, "</td>", collapse = "")
+      })
+      tbody <- paste0("<tr>", tbody, "</tr>", collapse = "")
+      return(paste0("<table border='1'><thead>", thead, "</thead><tbody>", tbody, "</tbody></table>"))
+    }
+
+    output$report_display <- renderUI({
+      tagList(
+        div(style = "padding: 20px; border: 1px solid #ddd; background-color: #f9f9f9; border-radius: 8px;",
+            h2("Statistical Analysis Report", style = "color: #2c3e50;"),
+            hr(),
+            h3("Likelihood Ratio Tests for the 'Group' factor"),
+            HTML(df_to_html(out_d)),
+            h3("Summary of multiple comparisons of means (± SE) of 'Group' levels"),
+            HTML(df_to_html(all_mc)),
+            h3("Pairwise comparisons of means"),
+            HTML(df_to_html(all_mc2)),
+            br(),
+            tags$footer(
+              p(em("This document was automatically generated with INFEST Light")),
+              p(strong("Date and time:"), Sys.time())
+            )
         )
-        writeLines(as.character(report_html), file)
-      }
-    )
+      )
+    })
   })
 }
 
 
 # ----------------------------------------------------------------
-ui = navbarPage(title = tags$head(img(src = "https://github.com/arsilva87/infest/blob/5b234a69a2a96aa83323d17643c2d8fff98b128c/inst/infest/www/infest_2_0.png?raw=true", height = 65), 
+ui = navbarPage(title = tags$head(img(src = "https://github.com/arsilva87/infest/blob/5b234a69a2a96aa83323d17643c2d8fff98b128c/inst/infest/www/infest_2_0.png?raw=true", height = 65),
                                   "Insect Feeding Behavior Statistics - light version"),
-                windowTitle = "INFEST 2.0 - Light",
+                windowTitle = "INFEST Light",
                 shinyjs::useShinyjs(),
                 div(style = "margin-top:-20px"),
                 # response variables  ------------------------------------------------------
@@ -491,49 +486,49 @@ ui = navbarPage(title = tags$head(img(src = "https://github.com/arsilva87/infest
                                                          min = 0, max = 7200, value = c(0, 7200)),
                                              fluidRow(
                                                column(3,
-                                               tags$br(),
-                                               actionButton("run", "Run", icon = icon("r-project"),
-                                                            style="color: white; background-color: #2e6da4; border-color: white")
-                                             )),
+                                                      tags$br(),
+                                                      actionButton("run", "Run", icon = icon("r-project"),
+                                                                   style="color: white; background-color: #2e6da4; border-color: white")
+                                               )),
                                              tags$small("Press F5/Refresh page to restart the app")
                                 )
                            ),
                            mainPanel(width = 9,
-                                                h5("Response variables by insect"),
-                                                tags$code("WARNING: only the column 'Group' should be edited!"),
-                                                rhandsontable::rHandsontableOutput("duration")
+                                     h5("Response variables by insect"),
+                                     tags$code("WARNING: only the column 'Group' should be edited!"),
+                                     rhandsontable::rHandsontableOutput("duration")
                            )
                          )
                 ),
                 # Report --------------------------------------------
                 tabPanel("Stats report", icon = icon("person-running"),
-                         #shinybusy::add_busy_spinner(spin = "orbit", position = "bottom-right"),
                          h5("NO SWEAT!"),
                          h5("Find the best-fitting model for each response variable
-                            as a function of the factor 'Group', perform multiple comparisons of means,
-                            then download a statistical analysis report."),
+                            as a function of the factor 'Group', perform multiple comparisons of means
+                            and create a statistical analysis report."),
                          tags$br(),
                          numericInput("conf1", "Confidence level",
-                                             value = 0.95, min = 0, max = 1, step = 0.01),
+                                      value = 0.95, min = 0, max = 1, step = 0.01),
                          checkboxInput("tukey", "Tukey's p-value adjustment", value = TRUE),
                          tags$code("WARNING: this is a time-consuming task"),
                          tags$br(),
                          actionButton("report", "Fit models", icon = icon("r-project"),
                                       style="color: white; background-color: #2e6da4; border-color: white"),
-                         downloadButton("downloadData", "Data"),
-                         downloadButton("downloadReport", "Report")
+                         tags$br(),
+                         uiOutput("report_display")
                 ),
                 tabPanel("About", icon = icon("info-circle"),
                          tags$p("Discover the full version of INFEST and know more from: ",
-                           tags$a(
-                             "arsilva87.github.io/infest/",
-                             href = "https://arsilva87.github.io/infest/",
-                             target = "_blank")
-                           )
+                                tags$a(
+                                  "arsilva87.github.io/infest/",
+                                  href = "https://arsilva87.github.io/infest/",
+                                  target = "_blank")
+                         )
                 )
 )
 
 # Run the app
 # runApp()   # to run locally
 shinyApp(ui = ui, server = server)
+
 
