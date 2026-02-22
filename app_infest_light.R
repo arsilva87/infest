@@ -1,5 +1,7 @@
 
 # The INFEST app: insect feeding behavior statistics, the light version
+# shinylive::export(appdir = "inst/infest", destdir = "docs")
+# httpuv::runStaticServer("docs")
 
 library(htmltools)
 library(gamlss)
@@ -534,3 +536,4 @@ ui = navbarPage(title = tags$head(img(src = "https://github.com/arsilva87/infest
 # Run the app
 # runApp()   # to run locally
 shinyApp(ui = ui, server = server)
+
