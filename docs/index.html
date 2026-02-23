@@ -9,11 +9,16 @@
       type="module"
     ></script>
     <script type="module">
-      import { runExportedApp } from "./shinylive/shinylive.js";
+      import { runExportedApp } from "./shinylive/shinylive.js"; 
       runExportedApp({
         id: "root",
         appEngine: "r",
         relPath: "",
+        // Pass webr configuration here to increase memory limits
+        webr: {
+          initialMemory: 16384, // Starts with 1GB
+          maximumMemory: 32768, // Can grow up to 2GB
+        },
       });
     </script>
     <link rel="stylesheet" href="./shinylive/style-resets.css" />
