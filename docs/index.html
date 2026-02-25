@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>INFEST Light</title>
+    <script>
+      // Force Cross-Origin Isolation to unlock more RAM
+      if (window.crossOriginIsolated === false) {
+        console.log("Enabling Cross-Origin Isolation for higher memory...");
+      }
+    </script>
     <script
       src="./shinylive/load-shinylive-sw.js"
       type="module"
