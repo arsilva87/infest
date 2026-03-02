@@ -1,8 +1,8 @@
 Package: infest
 Type: Package
 Title: INFEST: Insect Feeding Behavior Statistics
-Version: 2.02
-Date: 2026-02-16
+Version: 2.03
+Date: 2026-03-02
 LazyLoad: yes
 LazyData: yes
 Author: Anderson Rodrigo da Silva
