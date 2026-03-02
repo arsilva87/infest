@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<body>
+
+<div style="background-color:#f2f2f2; color:black; padding:5px;">
+
+<small>
+<p> To work properly, INFEST requires recent versions of <a href="https://cran.r-project.org/bin/windows/Rtools/" target="_blank">Rtools</a> and <a href="https://pandoc.org/" target="_blank">pandoc</a> to be previously installed. </p>
+
+<p>INFEST's instalation is expected to automatically install all its dependencies. However, one can run a manual check. Here are all packages INFEST needs: </p>
+
+<ul>
+  <li>shiny</li>
+  <li>devtools</li>
+  <li>gamlss</li>
+  <li>emmeans</li>
+  <li>estimability</li>
+  <li>ggeffects</li>
+  <li>igraph</li>
+  <li>factoextra</li>
+  <li>shinythemes</li>
+  <li>htmltools</li>
+  <li>DT</li>
+  <li>rhandsontable</li>
+  <li>shinyjs</li>
+  <li>reshape2</li>
+  <li>plotly</li>
+  <li>rmarkdown</li>
+  <li>multcomp</li>
+  <li>multcompView</li>
+  <li>shinybusy</li>
+</ul>
+
+<p>Try loading a package in R with
+<pre>library(gamlss)</pre>
+
+If it fails, install it
+<pre>install.packages("gamlss")</pre>
+
+After making sure all packages are installed, install INFEST:
+<pre>devtools::install_github("arsilva87/infest")</pre>
+</p>
+
+<p>Haven't figure it out? Contact me: anderson.silva@ifgoiano.edu.br</p>
+
+</small>
+
+</div>
+
+</body>
+</html>
+

@@ -627,8 +627,6 @@ server <- function(input, output, session){
     req(nlevels(grupos) > 1)
     variables <- tab()$duration
     dtf <- data.frame(Group = grupos, variables)
-    #w_col <- apply(dtf, 2, function(x) all(!is.na(x)))
-    #dtf <- dtf[, w_col]
     pval_adj <- ifelse(input$tukey == TRUE, "tukey", "none")
     conf_lev <- input$conf1
     progress <- shiny::Progress$new()
@@ -710,9 +708,9 @@ server <- function(input, output, session){
 ui = navbarPage(title = tags$head(img(src="infest_2_0.png", height = 65),
                                   "Insect Feeding Behavior Statistics"),
                 theme = shinytheme("yeti"),
-                windowTitle = "INFEST 2.02",
+                windowTitle = "INFEST 2.03",
                 useShinyjs(),
-                div(style = "margin-top:-20px"),
+                #div(style = "margin-top:-20px"),
                 # response variables  ------------------------------------------------------
                 tabPanel("Variables/Home", icon = icon("bug"),
                          actionButton("hideSidebar", "Hide sidebar",
@@ -848,6 +846,9 @@ ui = navbarPage(title = tags$head(img(src="infest_2_0.png", height = 65),
                 ),
                 tabPanel("About", icon = icon("info-circle"),
                          includeHTML('www/about.html')
+                ),
+                tabPanel("Troubleshooting", icon = icon("gear"),
+                         includeHTML('www/troubleshoot.html')
                 ),
                 tabPanel("News", icon = icon("flag"),
                          includeHTML('www/news.html')
